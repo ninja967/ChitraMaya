@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Build
+dashboard/dist/
+*.egg-info/
+
+# Outputs (generated media)
+outputs/
+
+# Training artifacts
+finetune/datasets/
+finetune/output/
+
+# Environment
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
