@@ -368,25 +368,25 @@ async def stop_comfy_bridge() -> None:
 
 
 async def _seed_builtin_characters() -> None:
-    existing = await get_character("rigo")
+    existing = await get_character("arjun")
     if existing:
         return
     await upsert_character({
-        "id": "rigo",
-        "name": "Rodrigo (NemoFlix)",
+        "id": "arjun",
+        "name": "Arjun (ChitraMaya)",
         "kind": "human",
-        "trigger": "Rigo",
-        "source_images": ["images/rigo-lora-api-test_00001_.png"],
+        "trigger": "Arjun",
+        "source_images": ["images/arjun-lora-test_00001_.png"],
         "loras": [{
             "workflow": "flux2_lora",
-            "name": "chitramaya-engine/rigo_flux2_lora_v1_dop.safetensors",
+            "name": "chitramaya-engine/arjun_flux2_lora_v1.safetensors",
             "strength": 1.0,
             "base_model": "flux2",
         }],
         "defaults": {
             "image_workflow": "flux2_lora",
             "video_workflow": "wan22_i2v",
-            "reference_image": "images/rigo-lora-api-test_00001_.png",
+            "reference_image": "images/arjun-lora-test_00001_.png",
         },
         "metadata": {"seeded": True},
     })
@@ -532,7 +532,7 @@ async def agent_chat(payload: dict[str, Any]) -> dict[str, Any]:
                 "ok": True,
                 "text": f"Ready to generate image with prompt: \'{prompt_text}\'. Use the sidebar Generate panel or POST /api/image/generate with this prompt and a character.",
                 "tool": "image_intent",
-                "suggested_payload": {"prompt": prompt_text, "character": "rigo"},
+                "suggested_payload": {"prompt": prompt_text, "character": "arjun"},
             }
 
         # Video generation intent
@@ -952,7 +952,7 @@ async def _run_render(project_id: str, shots: list[dict[str, Any]], render_id: s
             return
         clip_pairs.append((p, shot))
 
-    concat_tmp = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, prefix="nemo_concat_")
+    concat_tmp = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, prefix="cm_concat_")
     try:
         for p, _ in clip_pairs:
             concat_tmp.write(f"file '{p}'\n")
@@ -974,7 +974,7 @@ async def _run_render(project_id: str, shots: list[dict[str, Any]], render_id: s
         cumulative += duration
 
     if srt_entries:
-        srt_tmp = tempfile.NamedTemporaryFile("w", suffix=".srt", delete=False, prefix="nemo_srt_")
+        srt_tmp = tempfile.NamedTemporaryFile("w", suffix=".srt", delete=False, prefix="cm_srt_")
         try:
             srt_tmp.write("\n".join(srt_entries))
             srt_tmp.flush()
@@ -1492,8 +1492,8 @@ from fastapi.responses import FileResponse
 
 _OUTPUT_DIR = Path(get_settings().output_dir)
 _ALLOW_EXT = {".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm", ".gif"}
-_LORA_TRAINING_LOG = Path(os.environ.get("CHITRAMAYA_LORA_TRAINING_LOG", "/root/rigo-flux2-dop-train.log"))
-_LORA_JOB_NAME = os.environ.get("CHITRAMAYA_LORA_JOB_NAME", "rigo_flux2_lora_v1_dop")
+_LORA_TRAINING_LOG = Path(os.environ.get("CHITRAMAYA_LORA_TRAINING_LOG", "/root/arjun-flux2-train.log"))
+_LORA_JOB_NAME = os.environ.get("CHITRAMAYA_LORA_JOB_NAME", "arjun_flux2_lora_v1")
 _LORA_OUTPUT_DIR = Path(os.environ.get("CHITRAMAYA_LORA_OUTPUT_DIR", f"/root/chitramaya-training/output/{_LORA_JOB_NAME}"))
 _COMFY_LORA_DIR = Path(os.environ.get("CHITRAMAYA_COMFY_LORA_DIR", "/root/ComfyUI/models/loras/chitramaya-engine"))
 

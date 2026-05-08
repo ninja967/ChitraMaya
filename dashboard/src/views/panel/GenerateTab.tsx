@@ -26,7 +26,7 @@ interface CharacterSummary {
 }
 
 const DEFAULT_IMAGE_PROMPT =
-  "Rigo, portrait in a sleek AI media dashboard, leaning one hand on a workstation beside glowing video timeline screens, calm confident expression, modern editorial photography, warm cinematic key light, 85mm lens, shallow depth of field, realistic skin texture and sharp facial detail.";
+  "Arjun, portrait in a sleek AI media dashboard, leaning one hand on a workstation beside glowing video timeline screens, calm confident expression, modern editorial photography, warm cinematic key light, 85mm lens, shallow depth of field, realistic skin texture and sharp facial detail.";
 const DEFAULT_VIDEO_PROMPT =
   "cinematic motion, dramatic camera movement, atmospheric lighting, dynamic composition, polished short-form video style";
 

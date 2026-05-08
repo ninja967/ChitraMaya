@@ -61,7 +61,7 @@ curl -sS http://127.0.0.1:8190/api/characters
 # Image generation (FLUX.2 + LoRA)
 curl -sS -X POST http://127.0.0.1:8190/api/image/generate \
   -H "Content-Type: application/json" \
-  -d '{"character": "rigo", "prompt": "portrait, cinematic lighting"}'
+  -d '{"character": "arjun", "prompt": "portrait, cinematic lighting"}'
 
 # Video generation (Wan 2.2)
 curl -sS -X POST http://127.0.0.1:8190/api/video/generate \
@@ -95,7 +95,7 @@ curl -sS http://127.0.0.1:8190/api/lora-training/checkpoints
 # Create project → Add scenes → Add shots → Generate images → Animate → Render
 curl -sS -X POST http://127.0.0.1:8190/api/projects \
   -H "Content-Type: application/json" \
-  -d '{"title": "My Short Film", "characters": ["rigo"]}'
+  -d '{"title": "My Short Film", "characters": ["arjun"]}'
 ```
 
 ## Repo Structure

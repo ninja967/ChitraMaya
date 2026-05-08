@@ -51,8 +51,8 @@ Upload a dataset of character images:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8190/api/datasets/upload \
-  -F "name=rigo-identity" \
-  -F "file=@rigo-dataset.zip"
+  -F "name=arjun-identity" \
+  -F "file=@arjun-dataset.zip"
 ```
 
 Start LoRA training on MI300X:
@@ -61,9 +61,9 @@ Start LoRA training on MI300X:
 curl -sS -X POST http://127.0.0.1:8190/api/lora-training/start \
   -H "Content-Type: application/json" \
   -d '{
-    "job_name": "rigo_flux2_v1",
-    "trigger_word": "Rigo",
-    "dataset_path": "/root/chitramaya-training/datasets/rigo-identity",
+    "job_name": "arjun_flux2_v1",
+    "trigger_word": "Arjun",
+    "dataset_path": "/root/chitramaya-training/datasets/arjun-identity",
     "base_model": "flux2",
     "steps": 1800
   }'
@@ -83,7 +83,7 @@ Generate an image using the trained LoRA:
 curl -sS -X POST http://127.0.0.1:8190/api/image/generate \
   -H "Content-Type: application/json" \
   -d '{
-    "character": "rigo",
+    "character": "arjun",
     "prompt": "in an Iron Man suit, cinematic portrait, dramatic lighting"
   }'
 ```
@@ -99,7 +99,7 @@ curl -sS -X POST http://127.0.0.1:8190/api/video/generate \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "i2v",
-    "character": "rigo",
+    "character": "arjun",
     "prompt": "cinematic tracking shot, walking through neon rain",
     "width": 1280, "height": 720, "length": 121, "fps": 16
   }'
@@ -115,10 +115,10 @@ curl -sS -X POST http://127.0.0.1:8190/api/projects \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Suit Up",
-    "description": "Rigo suits up in his workshop and steps out into the rain.",
+    "description": "Arjun suits up in his workshop and steps out into the rain.",
     "aspect_ratio": "9:16",
     "duration_seconds": 30,
-    "characters": ["rigo"]
+    "characters": ["arjun"]
   }'
 ```
 
@@ -134,9 +134,9 @@ curl -sS -X POST http://127.0.0.1:8190/api/projects/{prj_id}/scenes/{scn_id}/sho
   -H "Content-Type: application/json" \
   -d '{
     "shot_number": 1,
-    "description": "Wide shot, Rigo standing on assembly platform, dramatic uplighting",
+    "description": "Wide shot, Arjun standing on assembly platform, dramatic uplighting",
     "subtitle": "Every hero has a moment where they stop being ordinary.",
-    "image_prompt": "Rigo, wide shot standing on industrial assembly platform, dramatic blue uplighting, cinematic",
+    "image_prompt": "Arjun, wide shot standing on industrial assembly platform, dramatic blue uplighting, cinematic",
     "motion_prompt": "slow push in, machinery activating around subject"
   }'
 ```

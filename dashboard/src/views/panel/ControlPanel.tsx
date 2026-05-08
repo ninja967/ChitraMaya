@@ -294,7 +294,7 @@ function GuideTab() {
   -d '{"id":"my-char","name":"My Character","trigger":"MyTrigger"}'` },
     { label: "Create project", cmd: `curl -X POST ${apiRoot}/api/projects \\
   -H "Content-Type: application/json" \\
-  -d '{"title":"My First Short","content":"A brief story...","characters":["rigo"]}'` },
+  -d '{"title":"My First Short","content":"A brief story...","characters":["arjun"]}'` },
     { label: "Add scene to project", cmd: `curl -X POST ${apiRoot}/api/projects/<prj_id>/scenes \\
   -H "Content-Type: application/json" \\
   -d '{"scene_number":1,"heading":"INT.-DAY","summary":"Scene summary"}'` },
@@ -306,10 +306,10 @@ function GuideTab() {
     { label: "View project", cmd: `curl ${apiRoot}/api/projects/<prj_id>` },
     { label: "Raw image generation", cmd: `curl -X POST ${apiRoot}/api/image/generate \\
   -H "Content-Type: application/json" \\
-  -d '{"character":"rigo","prompt":"dashboard portrait"}'` },
+  -d '{"character":"arjun","prompt":"dashboard portrait"}'` },
     { label: "Raw video generation", cmd: `curl -X POST ${apiRoot}/api/video/generate \\
   -H "Content-Type: application/json" \\
-  -d '{"character":"rigo","prompt":"walks forward","width":1024,"height":1024,"length":41}'` },
+  -d '{"character":"arjun","prompt":"walks forward","width":1024,"height":1024,"length":41}'` },
   ];
 
   return (

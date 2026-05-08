@@ -3,7 +3,7 @@ FROM node:22-slim
 WORKDIR /app
 
 COPY package.json ./
-COPY server.js ./
+COPY proxy.js ./
 COPY dashboard ./dashboard
 
 WORKDIR /app/dashboard
@@ -15,4 +15,4 @@ RUN npm install --omit=dev
 
 ENV PORT=7860
 EXPOSE 7860
-CMD ["node", "server.js"]
+CMD ["node", "proxy.js"]

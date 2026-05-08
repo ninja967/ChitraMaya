@@ -23,7 +23,7 @@ echo "=== AMD MI300X ROCm 7.2 ComfyUI Worker Setup Starting ==="
 $APT_GET update -y
 
 # Base utilities and Python tooling.
-$APT_GET install -y git git-lfs python3-pip python3.12-venv wget htop curl ca-certificates
+$APT_GET install -y git git-lfs python3-pip python3-venv wget htop curl ca-certificates
 
 git lfs install --system || true
 
