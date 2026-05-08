@@ -1,27 +1,14 @@
 ---
-title: ChitraMaya Engine Gallery
+title: ChitraMaya
 emoji: 🎬
-colorFrom: red
-colorTo: yellow
+colorFrom: purple
+colorTo: indigo
 sdk: docker
-app_port: 7860
-pinned: true
-tags:
-  - amd
-  - amd-hackathon-2026
-  - comfyui
-  - video-generation
-  - lora
+pinned: false
+license: apache-2.0
+short_description: Agent-native AI engine for image & video generation on AMD MI300X
 ---
 
-# ChitraMaya Engine Gallery
+# ChitraMaya
 
-Hosted ChitraMaya Studio UI for the AMD MI300X hackathon demo.
-
-This Space serves the real React/Vite Studio UI and proxies API/media requests to the ChitraMaya Engine control-plane API.
-
-## Required Space secret
-
-| Secret | Description |
-| --- | --- |
-| `CHITRAMAYA_API_URL` | URL for the ChitraMaya API|
+Agent-native image and video generation engine powered by AMD MI300X GPUs and ComfyUI.
