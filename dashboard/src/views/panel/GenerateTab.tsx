@@ -288,17 +288,23 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
       {mode === "i2v" && (
         <div className="space-y-3">
           <label className="block space-y-2">
-            <span className="text-xs font-medium text-gray-400">Source image path</span>
+            <span className="text-xs font-medium text-gray-400">Upload source image</span>
             <input
-              value={sourceImage}
-              onChange={(event) => setSourceImage(event.target.value)}
-              placeholder="images/example.png"
-              className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-600"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+              className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white file:mr-3 file:rounded-md file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-emerald-500 focus:outline-none focus:border-emerald-600"
             />
-            <p className="text-[10px] text-gray-600">
-              Paste an existing gallery filename for image-to-video processing.
-            </p>
           </label>
+
+          <button
+            type="button"
+            onClick={uploadSourceImage}
+            disabled={!uploadFile || uploading}
+            className="w-full rounded-md border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-950 disabled:text-gray-600 disabled:border-gray-800 px-4 py-2 text-sm text-gray-200 transition"
+          >
+            {uploading ? "Uploading..." : "Upload image for i2v"}
+          </button>
         </div>
       )}
 
