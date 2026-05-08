@@ -1,103 +1,83 @@
-import { Film, Terminal, Sparkles, ChevronDown } from "lucide-react";
+import { CheckCircle2, Film, GitBranch, ShieldCheck, Terminal } from "lucide-react";
 
 export function FilmsGuide({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={compact ? "h-full overflow-y-auto p-4 space-y-5" : "max-w-2xl mx-auto p-8 space-y-8"}>
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-violet-500/20 ring-1 ring-white/10">
-          <Film className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h2 className={compact ? "text-lg font-bold tracking-tight" : "text-xl font-bold tracking-tight"}>Projects</h2>
-          <p className="text-sm text-gray-500">Tell your AI agent what to make. It handles the rest.</p>
+    <div className={compact ? "h-full overflow-y-auto p-4 space-y-4" : "max-w-3xl mx-auto p-8 space-y-5"}>
+      <div className="rounded-lg border border-gray-800 bg-[#0c0f13] p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-md border border-emerald-500/20 bg-emerald-500/10 flex items-center justify-center">
+            <Film className="w-5 h-5 text-emerald-300" />
+          </div>
+          <div>
+            <h2 className={compact ? "text-lg font-bold tracking-tight" : "text-xl font-bold tracking-tight"}>
+              Project Pipeline
+            </h2>
+            <p className="text-sm text-gray-500">Structured scenes, shots, approvals, and render jobs.</p>
+          </div>
         </div>
       </div>
 
-      {/* Core instruction */}
-      <div className={compact ? "rounded-2xl border border-violet-600/20 bg-gradient-to-b from-violet-950/10 to-gray-900/20 p-4" : "rounded-2xl border border-violet-600/20 bg-gradient-to-b from-violet-950/10 to-gray-900/20 p-6"}>
-        <div className="flex items-center gap-2 mb-4">
-          <Terminal className="w-4 h-4 text-violet-400" />
-          <span className="text-sm font-semibold text-violet-200">How it works</span>
+      <div className="rounded-lg border border-gray-800 bg-[#0c0f13] p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <GitBranch className="w-4 h-4 text-emerald-300" />
+          <span className="text-sm font-semibold text-gray-200">Recommended judge demo flow</span>
         </div>
-        <p className="text-sm text-gray-300 leading-relaxed mb-4">
-          You talk to your AI agent like you'd talk to a person. Tell it what you want — the agent plans the scenes, picks the shots, generates the images, animates them, and stitches everything together. You just review and say yes or no.
-        </p>
-        <p className="text-xs text-gray-500">That's it. No settings. No config. Just talk.</p>
+        <div className="space-y-3">
+          {[
+            "Create a project record with title, aspect ratio, duration, and owned identity assets.",
+            "Break the story into scenes and shots before spending GPU time.",
+            "Generate storyboard images one shot at a time.",
+            "Animate approved frames into short clips.",
+            "Export or present the final sequence with job metadata and model provenance.",
+          ].map((item, index) => (
+            <div key={item} className="flex gap-3">
+              <div className="w-6 h-6 rounded-md bg-gray-900 border border-gray-800 flex items-center justify-center flex-shrink-0">
+                <span className="text-[10px] text-gray-400">{index + 1}</span>
+              </div>
+              <p className="text-xs text-gray-400 leading-relaxed pt-1">{item}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Example prompts — simple natural language */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          What to say to your agent
-        </h3>
-
+      <div className="grid gap-3">
         {[
           {
-            type: "Story video",
-            say: "Make me a short cyberpunk teaser. Dark city, rain, neon lights. My character is walking through it, and at the end he gets a phone call that changes everything. About a minute long, cinematic style.",
+            icon: CheckCircle2,
+            title: "Why this matters",
+            body: "A project is reviewable before rendering. That makes the demo feel controlled, auditable, and GPU-aware.",
           },
           {
-            type: "Character image",
-            say: "Create a 30-second montage of my character. Show different angles and expressions — serious, smiling, looking away. Studio lighting, clean background. I want to use these as profile pictures.",
+            icon: ShieldCheck,
+            title: "Identity safety",
+            body: "Only owned or synthetic identity assets should be attached to projects. Keep consent and dataset provenance visible.",
           },
           {
-            type: "Product demo",
-            say: "I need a 45-second product walkthrough. Show my character using the app on their phone, then switching to a laptop, then reacting to the results on screen. Modern office setting, natural light.",
+            icon: Terminal,
+            title: "Developer proof",
+            body: "Every action maps to an API endpoint, so an agent can operate the same pipeline that the UI exposes.",
           },
-          {
-            type: "Social media reel",
-            say: "Make me an Instagram reel — vertical format, quick cuts, high energy. My character doing everyday things in a cinematic way. Coffee, walking, looking at the skyline. 15 seconds.",
-          },
-          {
-            type: "Anime short",
-            say: "An anime-style short about a lone wanderer entering a haunted forest. Studio Ghibli vibes. About 45 seconds. Slow, atmospheric, beautiful.",
-          },
-          {
-            type: "Kids' storybook",
-            say: "A children's storybook style video. My character as the hero of a fairy tale — castle, forest, friendly dragon. Gentle narration vibe. One minute.",
-          },
-        ].map((ex, i) => (
-          <div key={i} className="rounded-xl border border-gray-800/40 bg-gray-900/20 p-4 hover:border-gray-600 transition">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] uppercase tracking-wider text-gray-500 bg-gray-800/60 rounded-md px-2 py-0.5">{ex.type}</span>
-            </div>
-            <p className="text-sm text-gray-300 leading-relaxed italic">"{ex.say}"</p>
+        ].map(({ icon: Icon, title, body }) => (
+          <div key={title} className="rounded-lg border border-gray-800 bg-[#0c0f13] p-4">
+            <Icon className="w-4 h-4 text-emerald-300" />
+            <p className="text-sm font-semibold text-gray-200 mt-3">{title}</p>
+            <p className="text-xs text-gray-500 leading-relaxed mt-1">{body}</p>
           </div>
         ))}
       </div>
 
-      {/* Iterate */}
-      <div className="rounded-2xl border border-gray-800/40 bg-gray-900/20 p-5">
-        <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-rose-400" />
-          After you see it, change anything
-        </h3>
-        <div className="space-y-1.5 text-sm text-gray-400">
-          <p>"I don't like shot 3 — try a wider angle"</p>
-          <p>"Make scene 2 darker, more moody"</p>
-          <p>"Swap my outfit to a hoodie in all shots"</p>
-          <p>"Add a slow-motion moment at the end"</p>
-          <p>"Cut the whole thing down to 30 seconds"</p>
-        </div>
-      </div>
-
-      {/* API peek — collapsed */}
-      <details className="rounded-2xl border border-gray-800/30 bg-gray-900/10 overflow-hidden">
-        <summary className="px-4 py-2.5 cursor-pointer hover:bg-gray-800/20 transition flex items-center gap-2 list-none">
-          <ChevronDown className="w-3 h-3 text-gray-600" />
-          <span className="text-[11px] text-gray-600">API endpoints (for developers)</span>
+      <details className="rounded-lg border border-gray-800 bg-[#0c0f13] overflow-hidden">
+        <summary className="px-4 py-2.5 cursor-pointer hover:bg-gray-900 transition list-none">
+          <span className="text-[11px] text-gray-500">API endpoints</span>
         </summary>
         <div className="px-4 pb-4">
-          <pre className="text-[10px] text-gray-600 font-mono leading-relaxed">
-{`POST   /api/projects                          create a project
-POST   /api/projects/:id/scenes                add a scene
-POST   /api/projects/:id/scenes/:sid/shots     add a shot
-POST   .../shots/:sid/generate-image           generate image
-POST   .../shots/:sid/animate                  animate shot
-GET    /api/projects/:id                       view full project
-POST   /api/projects/:id/export                export MP4`}
+          <pre className="text-[10px] text-gray-500 font-mono leading-relaxed whitespace-pre-wrap">
+{`POST   /api/projects
+POST   /api/projects/:id/scenes
+POST   /api/projects/:id/scenes/:sid/shots
+POST   /api/projects/:id/scenes/:sid/shots/:shot/generate-image
+POST   /api/projects/:id/scenes/:sid/shots/:shot/animate
+GET    /api/projects/:id`}
           </pre>
         </div>
       </details>

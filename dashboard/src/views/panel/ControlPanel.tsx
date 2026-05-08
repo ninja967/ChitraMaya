@@ -32,8 +32,8 @@ interface ControlPanelProps {
 export function ControlPanel({ activeTab, onTabChange, onClose, checkpoints, onQueued, onSelectCharacter, projectMode }: ControlPanelProps) {
   const topTabs: { id: PanelTab; icon: React.ReactNode; label: string; visible: boolean }[] = [
     { id: "generate", icon: <Image className="w-4 h-4" />, label: "Generate", visible: true },
-    { id: "characters", icon: <Users className="w-4 h-4" />, label: "Characters & LoRA Training", visible: true },
-    { id: "agents", icon: <Bot className="w-4 h-4" />, label: "Agents", visible: true },
+    { id: "characters", icon: <Users className="w-4 h-4" />, label: "Identity LoRA", visible: true },
+    { id: "agents", icon: <Bot className="w-4 h-4" />, label: "Orchestration", visible: true },
     { id: "projects", icon: <Film className="w-4 h-4" />, label: "Projects", visible: true },
     { id: "guide", icon: <BookOpen className="w-4 h-4" />, label: "Guide", visible: true },
     { id: "info", icon: <Info className="w-4 h-4" />, label: "Info", visible: true },
@@ -50,9 +50,9 @@ export function ControlPanel({ activeTab, onTabChange, onClose, checkpoints, onQ
   const visibleTabs = [...visibleTopTabs, ...visibleBottomTabs];
 
   return (
-    <div className="h-screen flex flex-shrink-0 border-r border-gray-800/60" style={{ width: `${SIDEBAR_WIDTH}px` }}>
+    <div className="h-screen flex flex-shrink-0 border-r border-gray-800" style={{ width: `${SIDEBAR_WIDTH}px` }}>
       {/* Icon rail */}
-      <div className="w-12 flex-shrink-0 bg-gray-950/60 border-r border-gray-800/40 flex flex-col items-center py-3 gap-1">
+      <div className="w-12 flex-shrink-0 bg-[#0b0d10] border-r border-gray-800 flex flex-col items-center py-3 gap-1">
         {visibleTopTabs.map((tab) => (
           <button
             key={tab.id}
@@ -60,13 +60,13 @@ export function ControlPanel({ activeTab, onTabChange, onClose, checkpoints, onQ
             title={tab.label}
             className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all relative group ${
               activeTab === tab.id
-                ? "bg-rose-600/10 text-rose-400 ring-1 ring-rose-500/20"
+                ? "bg-emerald-600/10 text-emerald-300 ring-1 ring-emerald-500/20"
                 : "text-gray-600 hover:text-gray-300 hover:bg-gray-900/60"
             }`}
           >
             {tab.icon}
             {activeTab === tab.id && (
-              <span className="absolute -left-1 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-rose-500 rounded-full" />
+              <span className="absolute -left-1 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-emerald-400 rounded-full" />
             )}
           </button>
         ))}
@@ -79,7 +79,7 @@ export function ControlPanel({ activeTab, onTabChange, onClose, checkpoints, onQ
               title={tab.label}
               className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all relative ${
                 activeTab === tab.id
-                  ? "bg-rose-600/10 text-rose-400 ring-1 ring-rose-500/20"
+                  ? "bg-emerald-600/10 text-emerald-300 ring-1 ring-emerald-500/20"
                   : "text-gray-600 hover:text-gray-300 hover:bg-gray-900/60"
               }`}
             >
@@ -97,8 +97,8 @@ export function ControlPanel({ activeTab, onTabChange, onClose, checkpoints, onQ
       </div>
 
       {/* Content panel */}
-      <div className="flex-1 flex flex-col min-w-0 bg-gray-950/40 overflow-hidden">
-        <div className="flex items-center px-4 py-2.5 border-b border-gray-800/40 flex-shrink-0">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#0c0f13] overflow-hidden">
+        <div className="flex items-center px-4 py-2.5 border-b border-gray-800 flex-shrink-0">
           <span className="text-sm font-semibold text-gray-300 tracking-tight">
             {projectMode && activeTab === "projects" ? "Scenes" : visibleTabs.find((tab) => tab.id === activeTab)?.label}
           </span>
@@ -249,10 +249,10 @@ function CreateCharacterWorkflow() {
       <div className="rounded-xl border border-gray-700/40 bg-gray-900/40 p-3">
         <p className="text-[11px] font-semibold text-gray-300 flex items-center gap-1.5 mb-2">
           <Terminal className="w-3.5 h-3.5 text-rose-400" />
-          Tell your AI agent:
+          Training request template
         </p>
         <p className="text-[11px] text-gray-400 leading-relaxed">
-          "Create a character for me. Upload my reference images, register the character, start a LoRA fine-tune on AMD MI300X, and let me know when it's ready to use."
+          "Upload an owned dataset, register a new identity asset, start a LoRA fine-tune on AMD MI300X, and report checkpoint status."
         </p>
       </div>
 
@@ -262,7 +262,7 @@ function CreateCharacterWorkflow() {
           { n: 1, title: "Upload your images", body: "5-20 reference photos. Different angles and lighting work best. Your agent can even generate variations to build a dataset." },
           { n: 2, title: "Register your character", body: "A character record with a unique trigger word — this is how the agent references your identity in every generation." },
           { n: 3, title: "Fine-tune on AMD MI300X", body: "Training a Flux2 LoRA on 192 GB MI300X VRAM via ROCm. Takes about 90 minutes. Your agent monitors progress and notifies you when done.", highlight: true },
-          { n: 4, title: "Generate consistently", body: 'Your character appears in the registry. From then on, just say "generate a shot with [character name] doing X" — your agent handles the rest.' },
+          { n: 4, title: "Generate consistently", body: "The identity asset appears in the registry and can be selected by API calls, projects, and render jobs." },
         ].map((step) => (
           <div key={step.n} className="flex gap-2.5">
             <div className={`flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center mt-0.5 ${step.highlight ? "bg-amber-500/20" : "bg-gray-800"}`}>
@@ -294,7 +294,7 @@ function GuideTab() {
   -d '{"id":"my-char","name":"My Character","trigger":"MyTrigger"}'` },
     { label: "Create project", cmd: `curl -X POST ${apiRoot}/api/projects \\
   -H "Content-Type: application/json" \\
-  -d '{"title":"My First Short","content":"A brief story...","characters":["arjun"]}'` },
+  -d '{"title":"My First Short","content":"A brief story...","characters":["maya_prototype"]}'` },
     { label: "Add scene to project", cmd: `curl -X POST ${apiRoot}/api/projects/<prj_id>/scenes \\
   -H "Content-Type: application/json" \\
   -d '{"scene_number":1,"heading":"INT.-DAY","summary":"Scene summary"}'` },
@@ -306,10 +306,10 @@ function GuideTab() {
     { label: "View project", cmd: `curl ${apiRoot}/api/projects/<prj_id>` },
     { label: "Raw image generation", cmd: `curl -X POST ${apiRoot}/api/image/generate \\
   -H "Content-Type: application/json" \\
-  -d '{"character":"arjun","prompt":"dashboard portrait"}'` },
+  -d '{"character":"maya_prototype","prompt":"dashboard portrait"}'` },
     { label: "Raw video generation", cmd: `curl -X POST ${apiRoot}/api/video/generate \\
   -H "Content-Type: application/json" \\
-  -d '{"character":"arjun","prompt":"walks forward","width":1024,"height":1024,"length":41}'` },
+  -d '{"character":"maya_prototype","prompt":"walks forward","width":1024,"height":1024,"length":41}'` },
   ];
 
   return (

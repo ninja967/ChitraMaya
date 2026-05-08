@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { BrowserRouter, Routes, Route, Outlet, useMatch, useNavigate, useParams } from "react-router-dom";
-import { Menu, Sparkles, UserCircle } from "lucide-react";
+import { Activity, Menu, Server, UserCircle } from "lucide-react";
 import { PortfolioView } from "./views/PortfolioView";
 import { ActorProfileView } from "./views/ActorProfileView";
 import { FilmsView } from "./views/FilmsView";
@@ -104,13 +104,13 @@ function Shell() {
       : undefined;
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
-      <header className="h-14 border-b border-gray-800/60 bg-black/90 backdrop-blur-xl flex items-center justify-between px-5 sticky top-0 z-40">
+    <div className="min-h-screen bg-[#08090b] text-white flex flex-col">
+      <header className="h-14 border-b border-gray-800 bg-[#0b0d10]/95 backdrop-blur-xl flex items-center justify-between px-5 sticky top-0 z-40">
         <div className="flex items-center gap-3 min-w-0">
           {!ctx.sidebarOpen && (
             <button
               onClick={() => ctx.setSidebarOpen(true)}
-              className="w-9 h-9 rounded-xl border border-gray-800 text-gray-500 hover:text-gray-200 hover:border-gray-600 transition"
+              className="w-9 h-9 rounded-md border border-gray-800 text-gray-500 hover:text-gray-200 hover:border-gray-600 transition"
               title="Open tools"
             >
               <Menu className="w-4 h-4 mx-auto" />
@@ -124,12 +124,12 @@ function Shell() {
             className="flex items-center gap-3 min-w-0 hover:opacity-80 transition"
             title="Home"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 via-fuchsia-500 to-amber-400 flex items-center justify-center shadow-lg shadow-rose-500/20 ring-1 ring-white/10">
-              <Sparkles className="w-4 h-4 text-white" />
+            <div className="w-9 h-9 rounded-md border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center">
+              <Activity className="w-4 h-4 text-emerald-300" />
             </div>
             <div className="min-w-0 hidden sm:block">
-              <h1 className="text-sm font-bold tracking-tight">ChitraMaya Studio</h1>
-              <p className="text-[10px] text-rose-400/60 tracking-wide">AMD MI300X</p>
+              <h1 className="text-sm font-bold tracking-tight">ChitraMaya Control Room</h1>
+              <p className="text-[10px] text-gray-500 tracking-wide">AMD MI300X media pipeline</p>
             </div>
           </button>
         </div>
@@ -142,30 +142,33 @@ function Shell() {
                 {ctx.jobs.length} generating
               </span>
             )}
-            <span className="rounded-full border border-gray-800 bg-gray-900/50 px-2.5 py-1 text-gray-500">
+            <span className="rounded-md border border-gray-800 bg-gray-950 px-2.5 py-1 text-gray-500">
               {ctx.items.length} media
             </span>
-            <span className="hidden lg:inline rounded-full border border-gray-800 bg-gray-900/50 px-2.5 py-1 text-gray-500">
+            <span className="hidden lg:inline rounded-md border border-gray-800 bg-gray-950 px-2.5 py-1 text-gray-500">
               {imageCount} images
             </span>
-            <span className="hidden lg:inline rounded-full border border-gray-800 bg-gray-900/50 px-2.5 py-1 text-gray-500">
+            <span className="hidden lg:inline rounded-md border border-gray-800 bg-gray-950 px-2.5 py-1 text-gray-500">
               {videoCount} videos
+            </span>
+            <span className="hidden xl:inline-flex items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-emerald-300">
+              <Server className="w-3 h-3" />
+              ComfyUI linked
             </span>
           </div>
 
           <div className="group relative">
-            <button className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-950/20 px-2.5 py-1.5 text-rose-100 hover:border-rose-400/50 transition">
+            <button className="flex items-center gap-2 rounded-md border border-gray-700 bg-gray-950 px-2.5 py-1.5 text-gray-200 hover:border-gray-500 transition">
               <UserCircle className="w-4 h-4" />
-              <span className="hidden sm:inline font-medium">Demo Account</span>
-              <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-amber-300">
-                Hackathon
+              <span className="hidden sm:inline font-medium">Operator View</span>
+              <span className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-emerald-300">
+                Live
               </span>
             </button>
-            <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-gray-800 bg-gray-950/95 p-4 shadow-2xl shadow-black/60 opacity-0 translate-y-1 transition group-hover:opacity-100 group-hover:translate-y-0">
-              <p className="text-xs font-semibold text-gray-200">Demo workspace</p>
+            <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 w-72 rounded-lg border border-gray-800 bg-gray-950/95 p-4 shadow-2xl shadow-black/60 opacity-0 translate-y-1 transition group-hover:opacity-100 group-hover:translate-y-0">
+              <p className="text-xs font-semibold text-gray-200">Hugging Face demo surface</p>
               <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                This hackathon build uses a sample owner dataset to demonstrate character LoRA training,
-                generation, and media management. Authentication is intentionally mocked for the demo.
+                A public control plane for image generation, video generation, identity LoRA work, and multi-shot project planning on AMD GPUs.
               </p>
             </div>
           </div>
@@ -191,7 +194,7 @@ function Shell() {
           />
         )}
 
-        <main className="flex-1 min-w-0 overflow-y-auto bg-gradient-to-b from-transparent via-transparent to-gray-950/30">
+        <main className="flex-1 min-w-0 overflow-y-auto bg-[#08090b]">
           <Outlet />
         </main>
       </div>

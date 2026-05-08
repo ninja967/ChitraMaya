@@ -26,9 +26,9 @@ interface CharacterSummary {
 }
 
 const DEFAULT_IMAGE_PROMPT =
-  "Arjun, portrait in a sleek AI media dashboard, leaning one hand on a workstation beside glowing video timeline screens, calm confident expression, modern editorial photography, warm cinematic key light, 85mm lens, shallow depth of field, realistic skin texture and sharp facial detail.";
+  "photorealistic editorial portrait inside a compact media operations room, video timeline screens in the background, confident subject, controlled studio key light, 85mm lens, shallow depth of field, realistic texture and sharp detail";
 const DEFAULT_VIDEO_PROMPT =
-  "cinematic motion, dramatic camera movement, atmospheric lighting, dynamic composition, polished short-form video style";
+  "cinematic tracking shot through a dense city street at night, controlled lighting, clear subject motion, polished short-form video style";
 
 function checkpointLabel(checkpoint: LoraCheckpoint) {
   if (checkpoint.step == null) return `${checkpoint.name} · final`;
@@ -152,37 +152,33 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
     }
   }
 
-  const characterPhrase = selectedCharacter ? ` using ${selectedCharacter.name}` : "";
-  const agentInstruction = mode === "image"
-    ? `Generate a new image${characterPhrase} from this idea.`
-    : mode === "t2v"
-      ? "Generate a short video from this idea."
-      : "Animate this gallery image into a short video.";
-
   return (
-    <div className="h-full overflow-y-auto p-4 space-y-5">
-      <section className="rounded-2xl border border-rose-600/30 bg-gradient-to-b from-rose-950/25 to-gray-950/70 p-4 space-y-3 shadow-lg shadow-rose-950/10">
-        <h2 className="text-lg font-semibold">Tell your agent what to make</h2>
-        <p className="text-sm text-gray-300 leading-relaxed">
-          Describe the result. The agent chooses the character, workflow, endpoint, and settings.
-        </p>
-        <div className="rounded-xl border border-gray-800 bg-black/35 p-3">
-          <p className="text-xs text-gray-300 leading-relaxed">“Generate an image of me walking through a rainy cyberpunk street.”</p>
+    <div className="h-full overflow-y-auto p-4 space-y-4">
+      <section className="rounded-lg border border-gray-800 bg-[#0c0f13] p-4 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-gray-100">Render Job</h2>
+          <span className="rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-emerald-300">
+            API-backed
+          </span>
         </div>
+        <p className="text-xs text-gray-500 leading-relaxed">
+          Submit one controlled image or video job. For multi-shot work, use Projects so each scene and shot can be
+          reviewed before GPU time is spent.
+        </p>
       </section>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 rounded-lg border border-gray-800 bg-[#0c0f13] p-2">
         {[
           ["image", "Image"],
-          ["t2v", "Text → Video"],
-          ["i2v", "Image → Video"],
+          ["t2v", "Text to Video"],
+          ["i2v", "Image to Video"],
         ].map(([id, label]) => (
           <button
             key={id}
             onClick={() => selectMode(id as GenerateMode)}
-            className={`rounded-lg border px-2 py-2 text-xs font-medium transition ${
+            className={`rounded-md border px-2 py-2 text-xs font-medium transition ${
               mode === id
-                ? "border-rose-500/60 bg-rose-600/15 text-rose-200"
+                ? "border-emerald-500/60 bg-emerald-600/15 text-emerald-200"
                 : "border-gray-800 bg-gray-950/60 text-gray-500 hover:text-gray-300"
             }`}
           >
@@ -192,13 +188,13 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
       </div>
 
       <label className="block space-y-2">
-        <span className="text-xs font-medium text-gray-400">Character</span>
+        <span className="text-xs font-medium text-gray-400">Identity asset</span>
         <select
           value={characterId}
           onChange={(event) => setCharacterId(event.target.value)}
-          className="w-full rounded-lg bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-600"
+          className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-600"
         >
-          <option value="none">No character / raw workflow</option>
+          <option value="none">No identity asset / raw workflow</option>
           {characters.map((character) => (
             <option key={character.id} value={character.id}>
               {character.name}{character.trigger ? ` · trigger: ${character.trigger}` : ""}
@@ -207,18 +203,18 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
         </select>
         {selectedCharacter && (
           <p className="text-[10px] text-gray-600 leading-relaxed">
-            Uses this character’s LoRA when available. Trigger word <span className="text-gray-400">{selectedCharacter.trigger || "none"}</span> is added automatically if it is missing from your prompt.
+            Uses this identity LoRA when available. Trigger word <span className="text-gray-400">{selectedCharacter.trigger || "none"}</span> is added automatically if missing.
           </p>
         )}
       </label>
 
       <label className="block space-y-2">
-        <span className="text-xs font-medium text-gray-400">Prompt / idea</span>
+        <span className="text-xs font-medium text-gray-400">Prompt</span>
         <textarea
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           rows={8}
-          className="w-full rounded-lg bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white leading-relaxed resize-y focus:outline-none focus:border-rose-600"
+          className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white leading-relaxed resize-y focus:outline-none focus:border-emerald-600"
         />
       </label>
 
@@ -228,9 +224,9 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
           <select
             value={checkpoint}
             onChange={(event) => setCheckpoint(event.target.value)}
-            className="w-full rounded-lg bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-600"
+            className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-600"
           >
-            <option value="base">Base Flux2 model — no LoRA</option>
+            <option value="base">Base Flux2 model - no LoRA</option>
             <option value="latest">Latest available LoRA checkpoint</option>
             {checkpoints.map((item) => (
               <option key={item.name} value={item.name}>
@@ -239,14 +235,14 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
             ))}
           </select>
           <p className="text-[10px] text-gray-600 leading-relaxed">
-            Raw image mode bypasses character selection. Use base Flux2 or optionally apply a LoRA checkpoint directly.
+            Raw image mode bypasses identity selection. Use base Flux2 or apply a LoRA checkpoint directly.
           </p>
         </label>
       )}
 
       {mode === "image" && characterId !== "none" && selectedCharacter && !selectedCharacterHasImageLora && (
-        <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-xs text-amber-200">
-          This character does not have an image LoRA registered for the current workflow yet.
+        <div className="rounded-md border border-amber-900/60 bg-amber-950/20 p-3 text-xs text-amber-200">
+          This identity asset does not have an image LoRA registered for the current workflow yet.
         </div>
       )}
 
@@ -257,7 +253,7 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
             value={sourceImage}
             onChange={(event) => setSourceImage(event.target.value)}
             placeholder="images/example.png"
-            className="w-full rounded-lg bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-600"
+            className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-600"
           />
           <p className="text-[10px] text-gray-600">Open a gallery item and use its filename as the source.</p>
         </label>
@@ -284,19 +280,19 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
       <button
         onClick={submit}
         disabled={submitting}
-        className="w-full rounded-lg bg-rose-600 hover:bg-rose-500 disabled:bg-gray-800 disabled:text-gray-500 px-4 py-2.5 text-sm font-semibold transition"
+        className="w-full rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-800 disabled:text-gray-500 px-4 py-2.5 text-sm font-semibold transition"
       >
         {submitting ? "Queueing..." : mode === "image" ? "Generate image" : "Generate video"}
       </button>
 
       {error && (
-        <div className="rounded-lg border border-red-900/60 bg-red-950/40 p-3 text-sm text-red-200">
+        <div className="rounded-md border border-red-900/60 bg-red-950/40 p-3 text-sm text-red-200">
           {error}
         </div>
       )}
 
       {result && (
-        <div className="rounded-lg border border-emerald-900/60 bg-emerald-950/30 p-3 space-y-2">
+        <div className="rounded-md border border-emerald-900/60 bg-emerald-950/30 p-3 space-y-2">
           <p className="text-sm font-medium text-emerald-200">Queued successfully</p>
           <div className="text-xs text-emerald-100/80 space-y-1 break-all">
             <p>Prompt ID: {result.prompt_id}</p>
@@ -334,7 +330,7 @@ function NumberField({
         max={max}
         step={step}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full rounded-lg bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-600"
+        className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-600"
       />
     </label>
   );
