@@ -25,6 +25,11 @@ interface CharacterSummary {
   source_images: string[];
 }
 
+interface UploadResponse {
+  ok: boolean;
+  image?: string | null;
+}
+
 const DEFAULT_IMAGE_PROMPT =
   "photorealistic editorial portrait inside a compact media operations room, video timeline screens in the background, confident subject, controlled studio key light, 85mm lens, shallow depth of field, realistic texture and sharp detail";
 const DEFAULT_VIDEO_PROMPT =
@@ -61,6 +66,8 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
   const [checkpoint, setCheckpoint] = useState("base");
   const [prompt, setPrompt] = useState(DEFAULT_IMAGE_PROMPT);
   const [sourceImage, setSourceImage] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [width, setWidth] = useState(1248);
   const [height, setHeight] = useState(832);
   const [steps, setSteps] = useState(20);
@@ -85,6 +92,38 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
     setPrompt(nextMode === "image" ? DEFAULT_IMAGE_PROMPT : DEFAULT_VIDEO_PROMPT);
     setResult(null);
     setError(null);
+  }
+
+  async function uploadSourceImage() {
+    if (!uploadFile) {
+      setError("Choose an image file to upload first.");
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const form = new FormData();
+      form.append("file", uploadFile);
+
+      const response = await fetch("/api/images/upload", {
+        method: "POST",
+        body: form,
+      });
+
+      const data = await response.json().catch(() => ({} as UploadResponse));
+      if (!response.ok || !data.image) {
+        throw new Error((data as { detail?: string }).detail || "Failed to upload source image.");
+      }
+
+      setSourceImage(data.image);
+      setUploadFile(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function submit() {
@@ -247,16 +286,20 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
       )}
 
       {mode === "i2v" && (
-        <label className="block space-y-2">
-          <span className="text-xs font-medium text-gray-400">Source image from gallery</span>
-          <input
-            value={sourceImage}
-            onChange={(event) => setSourceImage(event.target.value)}
-            placeholder="images/example.png"
-            className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-600"
-          />
-          <p className="text-[10px] text-gray-600">Open a gallery item and use its filename as the source.</p>
-        </label>
+        <div className="space-y-3">
+          <label className="block space-y-2">
+            <span className="text-xs font-medium text-gray-400">Source image path</span>
+            <input
+              value={sourceImage}
+              onChange={(event) => setSourceImage(event.target.value)}
+              placeholder="images/example.png"
+              className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-600"
+            />
+            <p className="text-[10px] text-gray-600">
+              Paste an existing gallery filename for image-to-video processing.
+            </p>
+          </label>
+        </div>
       )}
 
       <div className="grid grid-cols-2 gap-3">
