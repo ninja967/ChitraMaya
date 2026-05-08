@@ -127,14 +127,14 @@ class VideoGenerateRequest(BaseModel):
     negative: str = WAN_NEGATIVE
     width: int = 1280
     height: int = 720
-    length: int = Field(default=121, description="Frame count, not seconds")
+    length: int = Field(default=241, description="Frame count, not seconds")
     fps: int = 16
     seed: int | None = None
     filename_prefix: str = "videos"
-    steps_high: int = 2
-    steps_low: int = 2
-    cfg_high: float = 3.5
-    cfg_low: float = 3.5
+    steps_high: int = 30
+    steps_low: int = 20
+    cfg_high: float = 5.0
+    cfg_low: float = 5.0
     shift: float = 5.0
     sampler: str = "euler"
     scheduler: str = "simple"
@@ -351,6 +351,7 @@ async def _comfy_ws_bridge() -> None:
 async def start_comfy_bridge() -> None:
     global _WS_TASK
     await init_db()
+    await _purge_legacy_reference_characters()
     await _seed_builtin_characters()
     if _WS_TASK is None or _WS_TASK.done():
         _WS_TASK = asyncio.create_task(_comfy_ws_bridge())
@@ -367,26 +368,34 @@ async def stop_comfy_bridge() -> None:
     await close_db()
 
 
+async def _purge_legacy_reference_characters() -> None:
+    """Remove stale seeded demo identities from earlier deployments."""
+    for character in await list_characters():
+        metadata = character.get("metadata") if isinstance(character.get("metadata"), dict) else {}
+        is_old_seed = metadata.get("seeded") is True and character.get("id") != "maya_prototype"
+        if is_old_seed:
+            await delete_character(character["id"])
+
+
 async def _seed_builtin_characters() -> None:
-    existing = await get_character("arjun")
+    existing = await get_character("maya_prototype")
     if existing:
         return
     await upsert_character({
-        "id": "arjun",
-        "name": "Arjun (ChitraMaya)",
+        "id": "maya_prototype",
+        "name": "Maya Prototype",
         "kind": "human",
-        "trigger": "Arjun",
-        "source_images": ["images/arjun-lora-test_00001_.png"],
+        "trigger": "MayaPrototype",
+        "source_images": [],
         "loras": [{
             "workflow": "flux2_lora",
-            "name": "chitramaya-engine/arjun_flux2_lora_v1.safetensors",
+            "name": "chitramaya-engine/maya_prototype_flux2_lora_v1.safetensors",
             "strength": 1.0,
             "base_model": "flux2",
         }],
         "defaults": {
             "image_workflow": "flux2_lora",
             "video_workflow": "wan22_i2v",
-            "reference_image": "images/arjun-lora-test_00001_.png",
         },
         "metadata": {"seeded": True},
     })
@@ -532,7 +541,7 @@ async def agent_chat(payload: dict[str, Any]) -> dict[str, Any]:
                 "ok": True,
                 "text": f"Ready to generate image with prompt: \'{prompt_text}\'. Use the sidebar Generate panel or POST /api/image/generate with this prompt and a character.",
                 "tool": "image_intent",
-                "suggested_payload": {"prompt": prompt_text, "character": "arjun"},
+                "suggested_payload": {"prompt": prompt_text, "character": "maya_prototype"},
             }
 
         # Video generation intent
@@ -1492,8 +1501,8 @@ from fastapi.responses import FileResponse
 
 _OUTPUT_DIR = Path(get_settings().output_dir)
 _ALLOW_EXT = {".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm", ".gif"}
-_LORA_TRAINING_LOG = Path(os.environ.get("CHITRAMAYA_LORA_TRAINING_LOG", "/root/arjun-flux2-train.log"))
-_LORA_JOB_NAME = os.environ.get("CHITRAMAYA_LORA_JOB_NAME", "arjun_flux2_lora_v1")
+_LORA_TRAINING_LOG = Path(os.environ.get("CHITRAMAYA_LORA_TRAINING_LOG", "/root/chitramaya-flux2-train.log"))
+_LORA_JOB_NAME = os.environ.get("CHITRAMAYA_LORA_JOB_NAME", "maya_prototype_flux2_lora_v1")
 _LORA_OUTPUT_DIR = Path(os.environ.get("CHITRAMAYA_LORA_OUTPUT_DIR", f"/root/chitramaya-training/output/{_LORA_JOB_NAME}"))
 _COMFY_LORA_DIR = Path(os.environ.get("CHITRAMAYA_COMFY_LORA_DIR", "/root/ComfyUI/models/loras/chitramaya-engine"))
 
