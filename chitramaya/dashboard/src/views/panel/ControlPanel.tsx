@@ -224,62 +224,114 @@ function CharactersTab({ onSelectCharacter }: { onSelectCharacter?: (characterId
 }
 
 function CreateCharacterWorkflow() {
+  const [file, setFile] = useState<File | null>(null);
+  const [name, setName] = useState("");
+  const [trigger, setTrigger] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  async function handleStartTraining() {
+    if (!file || !name || !trigger) {
+      setError("Please fill all fields and select a dataset zip.");
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      // 1. Upload dataset
+      const form = new FormData();
+      const cleanName = name.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
+      form.append("name", cleanName);
+      form.append("file", file);
+      
+      const uploadRes = await fetch("/api/datasets/upload", { method: "POST", body: form });
+      if (!uploadRes.ok) throw new Error("Dataset upload failed");
+      const uploadData = await uploadRes.json();
+
+      // 2. Start training
+      const trainRes = await fetch("/api/lora-training/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job_name: cleanName,
+          trigger_word: trigger,
+          dataset_path: uploadData.dataset_path || uploadData.path,
+          base_model: "flux2",
+          steps: 1500
+        })
+      });
+      if (!trainRes.ok) throw new Error("Failed to start training");
+      
+      setSuccess(true);
+      setFile(null);
+      setName("");
+      setTrigger("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-rose-600/20 bg-gradient-to-b from-rose-950/10 to-gray-950 p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Box className="w-4 h-4 text-rose-400" />
-        <span className="text-xs font-semibold text-rose-300 uppercase tracking-wider">LoRA Fine-tuning</span>
+        <span className="text-xs font-semibold text-rose-300 uppercase tracking-wider">LoRA Fine-tuning Wizard</span>
         <span className="text-[10px] uppercase tracking-wider text-amber-300/80 border border-amber-500/20 bg-amber-500/5 rounded-full px-2 py-0.5 ml-auto">AMD MI300X</span>
       </div>
 
       <p className="text-xs text-gray-300 leading-relaxed">
-        <strong className="text-rose-200">Train your own character LoRA in ~90 minutes on AMD MI300X.</strong> Once fine-tuned, your AI agent can generate consistent images and videos with your face — every single time.
+        <strong className="text-rose-200">Train your own character LoRA in ~90 minutes.</strong> Upload a zip file with 10-20 reference images to start training on the AMD cluster.
       </p>
 
-      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-        <p className="text-[11px] font-semibold text-amber-300 flex items-center gap-1.5 mb-1">
-          <Cpu className="w-3.5 h-3.5" />
-          AMD MI300X — 192 GB VRAM
-        </p>
-        <p className="text-[11px] text-amber-200/70 leading-relaxed">
-          Fine-tuning runs on AMD's flagship GPU via ROCm. No CUDA required. Train a Flux2 LoRA in ~90 minutes, then generate images and videos immediately.
-        </p>
-      </div>
+      {/* ── Form ── */}
+      <div className="space-y-3 pt-2">
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block space-y-1">
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Character Name</span>
+            <input 
+              type="text" 
+              value={name} 
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Maya"
+              className="w-full bg-gray-900/60 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-rose-500/50"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Trigger Word</span>
+            <input 
+              type="text" 
+              value={trigger} 
+              onChange={(e) => setTrigger(e.target.value)}
+              placeholder="e.g. MayaPrototype"
+              className="w-full bg-gray-900/60 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-rose-500/50"
+            />
+          </label>
+        </div>
 
-      <div className="rounded-xl border border-gray-700/40 bg-gray-900/40 p-3">
-        <p className="text-[11px] font-semibold text-gray-300 flex items-center gap-1.5 mb-2">
-          <Terminal className="w-3.5 h-3.5 text-rose-400" />
-          Training request template
-        </p>
-        <p className="text-[11px] text-gray-400 leading-relaxed">
-          "Upload an owned dataset, register a new identity asset, start a LoRA fine-tune on AMD MI300X, and report checkpoint status."
-        </p>
-      </div>
+        <label className="block space-y-1">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Dataset (.zip containing images)</span>
+          <input 
+            type="file" 
+            accept=".zip"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="w-full bg-gray-900/60 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-gray-800 file:text-gray-300 hover:file:bg-gray-700 cursor-pointer"
+          />
+        </label>
 
-      <div className="space-y-2.5">
-        <p className="text-[11px] font-medium text-gray-400">How it works:</p>
-        {[
-          { n: 1, title: "Upload your images", body: "5-20 reference photos. Different angles and lighting work best. Your agent can even generate variations to build a dataset." },
-          { n: 2, title: "Register your character", body: "A character record with a unique trigger word — this is how the agent references your identity in every generation." },
-          { n: 3, title: "Fine-tune on AMD MI300X", body: "Training a Flux2 LoRA on 192 GB MI300X VRAM via ROCm. Takes about 90 minutes. Your agent monitors progress and notifies you when done.", highlight: true },
-          { n: 4, title: "Generate consistently", body: "The identity asset appears in the registry and can be selected by API calls, projects, and render jobs." },
-        ].map((step) => (
-          <div key={step.n} className="flex gap-2.5">
-            <div className={`flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center mt-0.5 ${step.highlight ? "bg-amber-500/20" : "bg-gray-800"}`}>
-              <span className={`text-[10px] font-medium ${step.highlight ? "text-amber-400" : "text-gray-500"}`}>{step.n}</span>
-            </div>
-            <div>
-              <p className={`text-[11px] ${step.highlight ? "text-amber-300 font-medium" : "text-gray-200"}`}>{step.title}</p>
-              <p className="text-[10px] text-gray-500 leading-relaxed mt-0.5">{step.body}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+        {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
+        {success && <p className="text-xs text-emerald-400 mt-1">Training job queued successfully!</p>}
 
-      <div className="pt-1 border-t border-gray-800/40">
-        <p className="text-[10px] text-gray-600">
-          Your agent knows the API. It uses <code className="text-gray-500">/api/characters</code> to register, <code className="text-gray-500">/api/lora-training</code> to fine-tune, and the Guide tab has all the curl commands.
-        </p>
+        <button 
+          onClick={handleStartTraining}
+          disabled={uploading}
+          className="w-full mt-2 py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 disabled:opacity-50 text-xs font-semibold text-rose-200 transition-all flex justify-center items-center gap-2"
+        >
+          {uploading ? "Uploading & Starting..." : "Start MI300X Training"}
+        </button>
       </div>
     </div>
   );

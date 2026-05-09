@@ -61,6 +61,12 @@ const MODE_CONFIG: { id: GenerateMode; label: string; icon: typeof ImageIcon; de
   { id: "i2v", label: "Image → Video", icon: Sparkles, desc: "Animate image" },
 ];
 
+const DEMO_PRESETS = [
+  { label: "Cinematic Portrait", mode: "image" as GenerateMode, prompt: "cinematic editorial portrait, moody studio lighting, 85mm lens, highly detailed, 8k resolution" },
+  { label: "Action Walk", mode: "t2v" as GenerateMode, prompt: "cinematic tracking shot, subject walking confidently forward through rain, neon lights, slow motion" },
+  { label: "Futuristic Studio", mode: "image" as GenerateMode, prompt: "subject standing in a futuristic tech lab, holographic screens, highly detailed, dramatic rim lighting" }
+];
+
 export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
   const latestCheckpoint = useMemo(() => {
     const final = checkpoints.find((checkpoint) => checkpoint.step == null);
@@ -445,6 +451,28 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
         {mode === "image" && (
           <SliderField label="LoRA Strength" value={loraStrength} onChange={setLoraStrength} min={0} max={2} step={0.05} />
         )}
+      </div>
+
+      {/* ── Demo Presets ── */}
+      <div className="space-y-2 animate-fade-in stagger-5">
+        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="w-1 h-1 rounded-full bg-fuchsia-500/60" />
+          Judge Demo Presets
+        </span>
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {DEMO_PRESETS.map((p) => (
+            <button
+              key={p.label}
+              onClick={() => {
+                setMode(p.mode);
+                setPrompt(p.prompt);
+              }}
+              className="flex-shrink-0 px-3 py-1.5 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-[10px] font-medium text-fuchsia-200 transition-colors whitespace-nowrap"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Submit Button ── */}
