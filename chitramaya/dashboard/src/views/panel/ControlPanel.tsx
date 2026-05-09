@@ -50,23 +50,23 @@ export function ControlPanel({ activeTab, onTabChange, onClose, checkpoints, onQ
   const visibleTabs = [...visibleTopTabs, ...visibleBottomTabs];
 
   return (
-    <div className="h-screen flex flex-shrink-0 border-r border-gray-800" style={{ width: `${SIDEBAR_WIDTH}px` }}>
+    <div className="h-screen flex flex-shrink-0 border-r border-white/[0.04]" style={{ width: `${SIDEBAR_WIDTH}px` }}>
       {/* Icon rail */}
-      <div className="w-12 flex-shrink-0 bg-[#0b0d10] border-r border-gray-800 flex flex-col items-center py-3 gap-1">
+      <div className="w-12 flex-shrink-0 bg-[#060709] border-r border-white/[0.04] flex flex-col items-center py-3 gap-1">
         {visibleTopTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             title={tab.label}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all relative group ${
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 relative group ${
               activeTab === tab.id
-                ? "bg-emerald-600/10 text-emerald-300 ring-1 ring-emerald-500/20"
-                : "text-gray-600 hover:text-gray-300 hover:bg-gray-900/60"
+                ? "bg-gradient-to-br from-emerald-500/15 to-teal-500/10 text-emerald-300 ring-1 ring-emerald-500/20 shadow-lg shadow-emerald-500/5"
+                : "text-gray-600 hover:text-gray-300 hover:bg-white/[0.03]"
             }`}
           >
             {tab.icon}
             {activeTab === tab.id && (
-              <span className="absolute -left-1 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-emerald-400 rounded-full" />
+              <span className="absolute -left-1 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-gradient-to-b from-emerald-400 to-teal-400 rounded-full" />
             )}
           </button>
         ))}
@@ -77,10 +77,10 @@ export function ControlPanel({ activeTab, onTabChange, onClose, checkpoints, onQ
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               title={tab.label}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all relative ${
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 relative ${
                 activeTab === tab.id
-                  ? "bg-emerald-600/10 text-emerald-300 ring-1 ring-emerald-500/20"
-                  : "text-gray-600 hover:text-gray-300 hover:bg-gray-900/60"
+                  ? "bg-gradient-to-br from-emerald-500/15 to-teal-500/10 text-emerald-300 ring-1 ring-emerald-500/20"
+                  : "text-gray-600 hover:text-gray-300 hover:bg-white/[0.03]"
               }`}
             >
               {tab.icon}
@@ -89,7 +89,7 @@ export function ControlPanel({ activeTab, onTabChange, onClose, checkpoints, onQ
           <button
             onClick={onClose}
             title="Close sidebar"
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-700 hover:text-gray-400 hover:bg-gray-900/60 transition mt-1"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-700 hover:text-gray-400 hover:bg-white/[0.03] transition-all duration-200 mt-1"
           >
             <X className="w-4 h-4" />
           </button>
@@ -97,9 +97,9 @@ export function ControlPanel({ activeTab, onTabChange, onClose, checkpoints, onQ
       </div>
 
       {/* Content panel */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#0c0f13] overflow-hidden">
-        <div className="flex items-center px-4 py-2.5 border-b border-gray-800 flex-shrink-0">
-          <span className="text-sm font-semibold text-gray-300 tracking-tight">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#080a0d] overflow-hidden">
+        <div className="flex items-center px-4 py-2.5 border-b border-white/[0.04] flex-shrink-0">
+          <span className="text-sm font-display font-semibold text-gray-200 tracking-tight">
             {projectMode && activeTab === "projects" ? "Scenes" : visibleTabs.find((tab) => tab.id === activeTab)?.label}
           </span>
         </div>

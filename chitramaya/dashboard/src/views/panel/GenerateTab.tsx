@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Upload, Zap, ImageIcon, Film, Sparkles, CheckCircle2, AlertCircle, Loader2, X } from "lucide-react";
 import type { LoraCheckpoint } from "../../models";
 
 interface GenerateTabProps {
@@ -54,6 +55,12 @@ function outputPrefix(mode: GenerateMode, prompt: string) {
   return `${bucket}/${slugPrompt(prompt)}-${Date.now()}`;
 }
 
+const MODE_CONFIG: { id: GenerateMode; label: string; icon: typeof ImageIcon; desc: string }[] = [
+  { id: "image", label: "Image", icon: ImageIcon, desc: "Still frame" },
+  { id: "t2v", label: "Text → Video", icon: Film, desc: "From prompt" },
+  { id: "i2v", label: "Image → Video", icon: Sparkles, desc: "Animate image" },
+];
+
 export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
   const latestCheckpoint = useMemo(() => {
     const final = checkpoints.find((checkpoint) => checkpoint.step == null);
@@ -67,7 +74,9 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
   const [prompt, setPrompt] = useState(DEFAULT_IMAGE_PROMPT);
   const [sourceImage, setSourceImage] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const [width, setWidth] = useState(1248);
   const [height, setHeight] = useState(832);
   const [steps, setSteps] = useState(20);
@@ -76,6 +85,8 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
     fetch("/api/characters")
@@ -92,6 +103,35 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
     setPrompt(nextMode === "image" ? DEFAULT_IMAGE_PROMPT : DEFAULT_VIDEO_PROMPT);
     setResult(null);
     setError(null);
+    setUploadFile(null);
+    setUploadPreview(null);
+    setUploadSuccess(false);
+    setSourceImage("");
+  }
+
+  function handleFileSelect(file: File | null) {
+    if (!file) return;
+    setUploadFile(file);
+    setUploadSuccess(false);
+    setSourceImage("");
+    const reader = new FileReader();
+    reader.onload = (e) => setUploadPreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  function clearUpload() {
+    setUploadFile(null);
+    setUploadPreview(null);
+    setUploadSuccess(false);
+    setSourceImage("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith("image/")) handleFileSelect(file);
   }
 
   async function uploadSourceImage() {
@@ -99,26 +139,18 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
       setError("Choose an image file to upload first.");
       return;
     }
-
     setUploading(true);
     setError(null);
-
     try {
       const form = new FormData();
       form.append("file", uploadFile);
-
-      const response = await fetch("/api/images/upload", {
-        method: "POST",
-        body: form,
-      });
-
+      const response = await fetch("/api/images/upload", { method: "POST", body: form });
       const data = await response.json().catch(() => ({} as UploadResponse));
       if (!response.ok || !data.image) {
         throw new Error((data as { detail?: string }).detail || "Failed to upload source image.");
       }
-
       setSourceImage(data.image);
-      setUploadFile(null);
+      setUploadSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -128,19 +160,14 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
 
   async function submit() {
     const cleanPrompt = prompt.trim();
-    if (!cleanPrompt) {
-      setError("Prompt is required.");
-      return;
-    }
+    if (!cleanPrompt) { setError("Prompt is required."); return; }
     if (mode === "i2v" && !sourceImage.trim()) {
-      setError("Image-to-video needs a source image path from the gallery, like images/example.png.");
+      setError("Please upload a source image first for Image → Video.");
       return;
     }
-
     setSubmitting(true);
     setError(null);
     setResult(null);
-
     try {
       const filenamePrefix = outputPrefix(mode, cleanPrompt);
       const endpoint = mode === "image" ? "/api/image/generate" : "/api/video/generate";
@@ -151,37 +178,23 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
             workflow: "flux2_lora",
             character: useCharacter ? characterId : undefined,
             checkpoint: useCheckpoint ? (checkpoint || latestCheckpoint) : undefined,
-            prompt: cleanPrompt,
-            width,
-            height,
-            steps,
-            guidance,
-            lora_strength: loraStrength,
-            filename_prefix: filenamePrefix,
-            submit: true,
+            prompt: cleanPrompt, width, height, steps, guidance,
+            lora_strength: loraStrength, filename_prefix: filenamePrefix, submit: true,
           }
         : {
             mode,
             character: useCharacter ? characterId : undefined,
             image: mode === "i2v" ? sourceImage.trim() : undefined,
-            prompt: cleanPrompt,
-            width,
-            height,
-            filename_prefix: filenamePrefix,
-            submit: true,
+            prompt: cleanPrompt, width, height,
+            filename_prefix: filenamePrefix, submit: true,
           };
-
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data?.detail || `${response.status}: failed to queue generation`);
-      }
-
+      if (!response.ok) throw new Error(data?.detail || `${response.status}: failed to queue generation`);
       setResult(data);
       onQueued?.();
     } catch (err) {
@@ -192,46 +205,70 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4 space-y-4">
-      <section className="rounded-lg border border-gray-800 bg-[#0c0f13] p-4 space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-gray-100">Render Job</h2>
-          <span className="rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-emerald-300">
-            API-backed
-          </span>
+    <div className="h-full overflow-y-auto p-4 space-y-5">
+      {/* ── Header ── */}
+      <section className="relative rounded-2xl border border-white/[0.06] overflow-hidden animate-fade-in">
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.06] via-transparent to-violet-500/[0.04]" />
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-radial from-emerald-500/10 to-transparent rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+        <div className="relative p-4 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/15 border border-emerald-500/20 flex items-center justify-center">
+                <Zap className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <h2 className="text-sm font-display font-bold text-gray-50">Render Engine</h2>
+                <p className="text-[10px] text-gray-600 font-medium">GPU-accelerated pipeline</p>
+              </div>
+            </div>
+            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-0.5 text-[10px] uppercase tracking-wider text-emerald-400 font-semibold flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Online
+            </span>
+          </div>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            Submit controlled render jobs to the AMD MI300X pipeline. Choose your mode, configure parameters, and queue.
+          </p>
         </div>
-        <p className="text-xs text-gray-500 leading-relaxed">
-          Submit one controlled image or video job. For multi-shot work, use Projects so each scene and shot can be
-          reviewed before GPU time is spent.
-        </p>
       </section>
 
-      <div className="grid grid-cols-3 gap-2 rounded-lg border border-gray-800 bg-[#0c0f13] p-2">
-        {[
-          ["image", "Image"],
-          ["t2v", "Text to Video"],
-          ["i2v", "Image to Video"],
-        ].map(([id, label]) => (
+      {/* ── Mode Selector ── */}
+      <div className="grid grid-cols-3 gap-2 animate-fade-in stagger-1">
+        {MODE_CONFIG.map(({ id, label, icon: Icon, desc }) => (
           <button
             key={id}
-            onClick={() => selectMode(id as GenerateMode)}
-            className={`rounded-md border px-2 py-2 text-xs font-medium transition ${
+            onClick={() => selectMode(id)}
+            className={`group relative rounded-xl border px-2.5 py-3 text-center transition-all duration-300 overflow-hidden ${
               mode === id
-                ? "border-emerald-500/60 bg-emerald-600/15 text-emerald-200"
-                : "border-gray-800 bg-gray-950/60 text-gray-500 hover:text-gray-300"
+                ? "border-emerald-500/40 bg-gradient-to-br from-emerald-500/[0.12] to-teal-500/[0.08] shadow-lg shadow-emerald-500/5"
+                : "border-white/[0.06] bg-white/[0.01] hover:border-white/[0.12] hover:bg-white/[0.03]"
             }`}
           >
-            {label}
+            {mode === id && (
+              <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/5 to-transparent" />
+            )}
+            <div className="relative">
+              <Icon className={`w-4 h-4 mx-auto mb-1.5 transition-colors ${mode === id ? "text-emerald-300" : "text-gray-600 group-hover:text-gray-400"}`} />
+              <p className={`text-xs font-semibold transition-colors ${mode === id ? "text-emerald-200" : "text-gray-400"}`}>{label}</p>
+              <p className={`text-[9px] mt-0.5 transition-colors ${mode === id ? "text-emerald-400/60" : "text-gray-700"}`}>{desc}</p>
+            </div>
+            {mode === id && (
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full" />
+            )}
           </button>
         ))}
       </div>
 
-      <label className="block space-y-2">
-        <span className="text-xs font-medium text-gray-400">Identity asset</span>
+      {/* ── Identity Asset ── */}
+      <label className="block space-y-2 animate-fade-in stagger-2">
+        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="w-1 h-1 rounded-full bg-emerald-500/60" />
+          Identity Asset
+        </span>
         <select
           value={characterId}
           onChange={(event) => setCharacterId(event.target.value)}
-          className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-600"
+          className="w-full rounded-xl bg-white/[0.02] border border-white/[0.08] px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200 appearance-none hover:border-white/[0.12]"
         >
           <option value="none">No identity asset / raw workflow</option>
           {characters.map((character) => (
@@ -241,31 +278,45 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
           ))}
         </select>
         {selectedCharacter && (
-          <p className="text-[10px] text-gray-600 leading-relaxed">
-            Uses this identity LoRA when available. Trigger word <span className="text-gray-400">{selectedCharacter.trigger || "none"}</span> is added automatically if missing.
+          <p className="text-[10px] text-gray-600 leading-relaxed pl-2.5 border-l-2 border-emerald-500/20">
+            Uses identity LoRA. Trigger <span className="text-emerald-400/80 font-mono">{selectedCharacter.trigger || "none"}</span> auto-injected.
           </p>
         )}
       </label>
 
-      <label className="block space-y-2">
-        <span className="text-xs font-medium text-gray-400">Prompt</span>
-        <textarea
-          value={prompt}
-          onChange={(event) => setPrompt(event.target.value)}
-          rows={8}
-          className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white leading-relaxed resize-y focus:outline-none focus:border-emerald-600"
-        />
+      {/* ── Prompt ── */}
+      <label className="block space-y-2 animate-fade-in stagger-3">
+        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="w-1 h-1 rounded-full bg-violet-500/60" />
+          Prompt
+        </span>
+        <div className="relative group">
+          <textarea
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            rows={6}
+            className="w-full rounded-xl bg-white/[0.02] border border-white/[0.08] px-3 py-2.5 text-sm text-white leading-relaxed resize-y focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200 placeholder:text-gray-700 hover:border-white/[0.12]"
+            placeholder="Describe what you want to generate..."
+          />
+          <div className="absolute bottom-2 right-2 text-[9px] text-gray-700 font-mono">
+            {prompt.length} chars
+          </div>
+        </div>
       </label>
 
+      {/* ── Checkpoint (image mode, no character) ── */}
       {mode === "image" && characterId === "none" && (
-        <label className="block space-y-2">
-          <span className="text-xs font-medium text-gray-400">Raw image checkpoint</span>
+        <label className="block space-y-2 animate-fade-in">
+          <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="w-1 h-1 rounded-full bg-amber-500/60" />
+            Checkpoint
+          </span>
           <select
             value={checkpoint}
             onChange={(event) => setCheckpoint(event.target.value)}
-            className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-600"
+            className="w-full rounded-xl bg-white/[0.02] border border-white/[0.08] px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200 appearance-none hover:border-white/[0.12]"
           >
-            <option value="base">Base Flux2 model - no LoRA</option>
+            <option value="base">Base Flux2 model — no LoRA</option>
             <option value="latest">Latest available LoRA checkpoint</option>
             {checkpoints.map((item) => (
               <option key={item.name} value={item.name}>
@@ -273,78 +324,178 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
               </option>
             ))}
           </select>
-          <p className="text-[10px] text-gray-600 leading-relaxed">
-            Raw image mode bypasses identity selection. Use base Flux2 or apply a LoRA checkpoint directly.
-          </p>
         </label>
       )}
 
+      {/* ── Missing LoRA warning ── */}
       {mode === "image" && characterId !== "none" && selectedCharacter && !selectedCharacterHasImageLora && (
-        <div className="rounded-md border border-amber-900/60 bg-amber-950/20 p-3 text-xs text-amber-200">
-          This identity asset does not have an image LoRA registered for the current workflow yet.
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-3 text-xs text-amber-300 flex items-start gap-2.5 animate-fade-in">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>This identity asset does not have an image LoRA registered for the current workflow yet.</span>
         </div>
       )}
 
+      {/* ── Image-to-Video: Upload Zone ── */}
       {mode === "i2v" && (
-        <div className="space-y-3">
-          <label className="block space-y-2">
-            <span className="text-xs font-medium text-gray-400">Upload source image</span>
+        <div className="space-y-3 animate-fade-in">
+          <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="w-1 h-1 rounded-full bg-rose-500/60" />
+            Source Image
+            {uploadSuccess && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 ml-1" />}
+          </span>
+
+          {/* Drop zone / Upload area */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`relative rounded-xl border-2 border-dashed transition-all duration-300 cursor-pointer overflow-hidden ${
+              dragOver
+                ? "border-emerald-400/60 bg-emerald-500/[0.06]"
+                : uploadPreview
+                ? "border-emerald-500/30 bg-emerald-500/[0.03]"
+                : "border-white/[0.1] bg-white/[0.01] hover:border-emerald-500/30 hover:bg-emerald-500/[0.02]"
+            }`}
+          >
             <input
+              ref={fileInputRef}
               type="file"
               accept="image/png,image/jpeg,image/webp"
-              onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
-              className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white file:mr-3 file:rounded-md file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-emerald-500 focus:outline-none focus:border-emerald-600"
+              onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+              className="hidden"
             />
-          </label>
 
-          <button
-            type="button"
-            onClick={uploadSourceImage}
-            disabled={!uploadFile || uploading}
-            className="w-full rounded-md border border-gray-700 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-950 disabled:text-gray-600 disabled:border-gray-800 px-4 py-2 text-sm text-gray-200 transition"
-          >
-            {uploading ? "Uploading..." : "Upload image for i2v"}
-          </button>
+            {uploadPreview ? (
+              <div className="relative">
+                <img src={uploadPreview} alt="Preview" className="w-full h-36 object-cover rounded-lg" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-lg" />
+                <button
+                  onClick={(e) => { e.stopPropagation(); clearUpload(); }}
+                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white/80 hover:bg-red-500/60 hover:border-red-400/40 transition-all"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+                <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                  <span className="text-[10px] text-white/80 font-medium truncate max-w-[60%]">
+                    {uploadFile?.name}
+                  </span>
+                  {uploadSuccess ? (
+                    <span className="text-[10px] text-emerald-300 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Uploaded
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-amber-300/80">Ready to upload</span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 gap-2.5">
+                <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center transition-all duration-300 ${
+                  dragOver
+                    ? "border-emerald-400/40 bg-emerald-500/10"
+                    : "border-white/[0.08] bg-white/[0.02]"
+                }`}>
+                  <Upload className={`w-5 h-5 transition-colors ${dragOver ? "text-emerald-300" : "text-gray-600"}`} />
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-300 font-medium">Drop image here or click to browse</p>
+                  <p className="text-[10px] text-gray-600 mt-0.5">PNG, JPEG, WebP supported</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Upload button */}
+          {uploadFile && !uploadSuccess && (
+            <button
+              type="button"
+              onClick={uploadSourceImage}
+              disabled={uploading}
+              className="w-full rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/15 hover:to-teal-500/15 disabled:from-transparent disabled:to-transparent disabled:border-white/[0.06] disabled:text-gray-700 px-4 py-2.5 text-sm text-emerald-200 transition-all duration-300 font-medium flex items-center justify-center gap-2"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Upload for animation
+                </>
+              )}
+            </button>
+          )}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <NumberField label="Width" value={width} onChange={setWidth} min={512} max={2048} step={64} />
-        <NumberField label="Height" value={height} onChange={setHeight} min={512} max={2048} step={64} />
-        {mode === "image" && <NumberField label="Steps" value={steps} onChange={setSteps} min={1} max={60} step={1} />}
-        {mode === "image" && <NumberField label="Guidance" value={guidance} onChange={setGuidance} min={1} max={10} step={0.5} />}
+      {/* ── Dimension Controls ── */}
+      <div className="space-y-2 animate-fade-in stagger-4">
+        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="w-1 h-1 rounded-full bg-cyan-500/60" />
+          Parameters
+        </span>
+        <div className="grid grid-cols-2 gap-2.5">
+          <SliderField label="Width" value={width} onChange={setWidth} min={512} max={2048} step={64} unit="px" />
+          <SliderField label="Height" value={height} onChange={setHeight} min={512} max={2048} step={64} unit="px" />
+          {mode === "image" && <SliderField label="Steps" value={steps} onChange={setSteps} min={1} max={60} step={1} />}
+          {mode === "image" && <SliderField label="Guidance" value={guidance} onChange={setGuidance} min={1} max={10} step={0.5} />}
+        </div>
+        {mode === "image" && (
+          <SliderField label="LoRA Strength" value={loraStrength} onChange={setLoraStrength} min={0} max={2} step={0.05} />
+        )}
       </div>
 
-      {mode === "image" && (
-        <NumberField
-          label="LoRA strength"
-          value={loraStrength}
-          onChange={setLoraStrength}
-          min={0}
-          max={2}
-          step={0.05}
-        />
-      )}
-
+      {/* ── Submit Button ── */}
       <button
         onClick={submit}
         disabled={submitting}
-        className="w-full rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-800 disabled:text-gray-500 px-4 py-2.5 text-sm font-semibold transition"
+        className="group w-full relative rounded-xl overflow-hidden px-4 py-3.5 text-sm font-bold transition-all duration-300 disabled:opacity-40"
       >
-        {submitting ? "Queueing..." : mode === "image" ? "Generate image" : "Generate video"}
+        <div className={`absolute inset-0 transition-all duration-300 ${
+          submitting
+            ? "bg-gray-800"
+            : "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 group-hover:from-emerald-500 group-hover:via-emerald-400 group-hover:to-teal-400"
+        }`} />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+        {!submitting && (
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/0 via-white/10 to-emerald-400/0 animate-shimmer" style={{ backgroundSize: "200% 100%" }} />
+          </div>
+        )}
+        <span className="relative flex items-center justify-center gap-2">
+          {submitting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Queueing render job...
+            </>
+          ) : (
+            <>
+              <Zap className="w-4 h-4" />
+              {mode === "image" ? "Generate Image" : "Generate Video"}
+            </>
+          )}
+        </span>
       </button>
 
+      {/* ── Error ── */}
       {error && (
-        <div className="rounded-md border border-red-900/60 bg-red-950/40 p-3 text-sm text-red-200">
-          {error}
+        <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-3.5 flex items-start gap-2.5 animate-fade-in">
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-300 leading-relaxed">{error}</p>
         </div>
       )}
 
+      {/* ── Success ── */}
       {result && (
-        <div className="rounded-md border border-emerald-900/60 bg-emerald-950/30 p-3 space-y-2">
-          <p className="text-sm font-medium text-emerald-200">Queued successfully</p>
-          <div className="text-xs text-emerald-100/80 space-y-1 break-all">
-            <p>Prompt ID: {result.prompt_id}</p>
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4 space-y-2.5 animate-scale-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <p className="text-sm font-display font-semibold text-emerald-200">Render job queued</p>
+          </div>
+          <div className="text-xs text-emerald-300/60 space-y-1 break-all font-mono pl-6">
+            <p>ID: {result.prompt_id}</p>
             {result.checkpoint && <p>Checkpoint: {result.checkpoint}</p>}
             {result.lora_name && <p>LoRA: {result.lora_name}</p>}
           </div>
@@ -354,32 +505,27 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
   );
 }
 
-function NumberField({
-  label,
-  value,
-  onChange,
-  min,
-  max,
-  step,
+/* ── Slider Field Component ── */
+function SliderField({
+  label, value, onChange, min, max, step, unit,
 }: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
+  label: string; value: number; onChange: (value: number) => void;
+  min?: number; max?: number; step?: number; unit?: string;
 }) {
   return (
-    <label className="block space-y-2">
-      <span className="text-xs font-medium text-gray-400">{label}</span>
+    <label className="block space-y-1.5 group">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{label}</span>
+        <span className="text-[10px] font-mono text-emerald-400/60">{value}{unit || ""}</span>
+      </div>
       <input
-        type="number"
+        type="range"
         value={value}
         min={min}
         max={max}
         step={step}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full rounded-md bg-gray-950 border border-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-600"
+        className="w-full h-1.5 rounded-full appearance-none bg-white/[0.06] cursor-pointer accent-emerald-500 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-emerald-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-emerald-500/30 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-emerald-300 [&::-webkit-slider-thumb]:transition-all [&::-webkit-slider-thumb]:hover:scale-125"
       />
     </label>
   );
