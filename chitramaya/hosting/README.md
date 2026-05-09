@@ -12,6 +12,12 @@ tags:
   - comfyui
   - video-generation
   - lora
+  - text-to-video
+  - image-to-video
+  - text-to-image
+  - flux
+  - wan-video
+  - agentic-ai
 ---
 
 # ChitraMaya Control Room
