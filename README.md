@@ -1,3 +1,19 @@
+---
+title: ChitraMaya
+emoji: 🎥
+colorFrom: purple
+colorTo: blue
+sdk: docker
+pinned: false
+tags:
+  - text-to-video
+  - image-to-video
+  - text-to-image
+  - flux
+  - wan-video
+  - comfyui
+  - agentic-ai
+---
 # ChitraMaya
 
 Agent-native image and video generation using ComfyUI as a headless execution engine on AMD MI300X GPUs.
@@ -28,7 +44,7 @@ ChitraMaya is designed for AI agents first. Agents call a simple HTTP API; Chitr
 
 ```bash
 # 1. Clone
-git clone https://github.com/chitramaya-ai/chitramaya.git && cd chitramaya
+git clone https://github.com/ninja967/ChitraMaya.git && cd ChitraMaya
 
 # 2. Install Python deps
 python3 -m venv .venv && . .venv/bin/activate
@@ -61,7 +77,7 @@ curl -sS http://127.0.0.1:8190/api/characters
 # Image generation (FLUX.2 + LoRA)
 curl -sS -X POST http://127.0.0.1:8190/api/image/generate \
   -H "Content-Type: application/json" \
-  -d '{"character": "arjun", "prompt": "portrait, cinematic lighting"}'
+  -d '{"character": "maya_prototype", "prompt": "portrait, cinematic lighting"}'
 
 # Video generation (Wan 2.2)
 curl -sS -X POST http://127.0.0.1:8190/api/video/generate \
@@ -95,7 +111,7 @@ curl -sS http://127.0.0.1:8190/api/lora-training/checkpoints
 # Create project → Add scenes → Add shots → Generate images → Animate → Render
 curl -sS -X POST http://127.0.0.1:8190/api/projects \
   -H "Content-Type: application/json" \
-  -d '{"title": "My Short Film", "characters": ["arjun"]}'
+  -d '{"title": "My Short Film", "characters": ["maya_prototype"]}'
 ```
 
 ## Repo Structure
