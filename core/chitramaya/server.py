@@ -127,12 +127,12 @@ class VideoGenerateRequest(BaseModel):
     negative: str = WAN_NEGATIVE
     width: int = 1280
     height: int = 720
-    length: int = Field(default=241, description="Frame count, not seconds")
+    length: int = Field(default=81, description="Frame count, not seconds (81 = ~5s)")
     fps: int = 16
     seed: int | None = None
     filename_prefix: str = "videos"
-    steps_high: int = 30
-    steps_low: int = 20
+    steps_high: int = 20
+    steps_low: int = 10
     cfg_high: float = 5.0
     cfg_low: float = 5.0
     shift: float = 5.0
