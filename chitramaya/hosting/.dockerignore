@@ -1,0 +1,12 @@
+node_modules
+dashboard/node_modules
+dashboard/dist
+dashboard/.vite
+*.tsbuildinfo
+dashboard/*.tsbuildinfo
+.env
+.env.*
+.git
+.gitignore
+__pycache__
+.venv
