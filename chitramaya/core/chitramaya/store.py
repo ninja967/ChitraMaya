@@ -267,7 +267,7 @@ async def upsert_project(project: dict[str, Any]) -> dict[str, Any]:
             project["id"],
             project["title"],
             project.get("description"),
-            project.get("aspect_ratio", "9:16"),
+            project.get("aspect_ratio", "16:9"),
             project.get("duration_seconds"),
             project.get("status", "draft"),
             _json(project.get("characters", [])),

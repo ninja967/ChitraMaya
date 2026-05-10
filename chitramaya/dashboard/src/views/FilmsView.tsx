@@ -79,7 +79,7 @@ export function FilmsView({ compact = false, onOpenProject }: FilmsViewProps) {
       const response = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, aspect_ratio: "9:16", status: "draft" }),
+        body: JSON.stringify({ title, aspect_ratio: "16:9", status: "draft" }),
       });
       if (!response.ok) throw new Error(`Create failed: ${response.status}`);
       const created = await response.json();

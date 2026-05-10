@@ -61,7 +61,7 @@ class ProjectRecord(BaseModel):
     id: str | None = None
     title: str = Field(min_length=1)
     description: str | None = None
-    aspect_ratio: str = "9:16"
+    aspect_ratio: str = "16:9"
     duration_seconds: int | None = None
     status: str = "draft"
     characters: list[str] = Field(default_factory=list)
