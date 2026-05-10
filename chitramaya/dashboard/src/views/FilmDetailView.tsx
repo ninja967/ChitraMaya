@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Film, Image as ImageIcon, Video, Wand2, Plus, Save, Layers, Sparkles, Edit3, Play, ArrowLeft, Trash2, Clapperboard, Loader2 } from "lucide-react";
+import { Film, Image as ImageIcon, Video, Wand2, Plus, Save, Layers, Sparkles, Edit3, Play, ArrowLeft, Trash2, Clapperboard, Loader2, Download } from "lucide-react";
 import type { JobItem, Project, Scene, Shot, ShotVersion, FilmPhase } from "../models";
 
 interface FilmDetailViewProps {
@@ -286,14 +286,23 @@ export function FilmDetailView({
             </button>
           )}
           {renderStatus === "completed" && finalVideoUrl && (
-            <a
-              href={finalVideoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-600/15 hover:bg-emerald-600/25 px-3 py-1.5 text-xs font-medium text-emerald-100 transition"
-            >
-              <Play className="w-3.5 h-3.5" /> Watch final video
-            </a>
+            <div className="flex gap-1.5">
+              <a
+                href={finalVideoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-600/15 hover:bg-emerald-600/25 px-3 py-1.5 text-xs font-medium text-emerald-100 transition"
+              >
+                <Play className="w-3.5 h-3.5" /> Watch
+              </a>
+              <a
+                href={finalVideoUrl}
+                download="final-render"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-gray-300 transition"
+              >
+                <Download className="w-3.5 h-3.5" /> Save
+              </a>
+            </div>
           )}
         </div>
       </div>

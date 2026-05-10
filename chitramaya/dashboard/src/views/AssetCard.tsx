@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Trash2, X, Play } from "lucide-react";
+import { Check, Trash2, X, Play, Download } from "lucide-react";
 import type { MediaItem } from "../models";
 
 interface AssetCardProps {
@@ -39,19 +39,30 @@ export function AssetCard({ item, onOpen, onDelete }: AssetCardProps) {
       {/* Ambient gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-      {/* Delete button */}
-      {!confirmDelete && (
-        <button
-          onClick={(event) => {
-            event.stopPropagation();
-            setConfirmDelete(true);
-          }}
-          className="absolute top-2 right-2 z-10 w-8 h-8 rounded-lg bg-black/50 backdrop-blur-md text-white/70 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-600/90 hover:text-white transition-all duration-200 border border-white/[0.06]"
-          title="Delete"
+      {/* Action buttons */}
+      <div className="absolute top-2 right-2 z-10 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <a
+          href={item.url}
+          download={item.name || "chitra-maya-output"}
+          onClick={(e) => e.stopPropagation()}
+          className="w-8 h-8 rounded-lg bg-black/50 backdrop-blur-md text-white/70 flex items-center justify-center hover:bg-emerald-600/90 hover:text-white transition-all duration-200 border border-white/[0.06]"
+          title="Download"
         >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      )}
+          <Download className="w-3.5 h-3.5" />
+        </a>
+        {!confirmDelete && (
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              setConfirmDelete(true);
+            }}
+            className="w-8 h-8 rounded-lg bg-black/50 backdrop-blur-md text-white/70 flex items-center justify-center hover:bg-red-600/90 hover:text-white transition-all duration-200 border border-white/[0.06]"
+            title="Delete"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
 
       {/* Bottom info bar */}
       <div className="absolute bottom-0 left-0 right-0 p-3 pt-8 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none translate-y-1 group-hover:translate-y-0">

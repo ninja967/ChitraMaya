@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { BrowserRouter, Routes, Route, Outlet, useMatch, useNavigate, useParams } from "react-router-dom";
-import { Activity, Loader2, Menu, Server, UserCircle } from "lucide-react";
+import { Activity, Download, Loader2, Menu, Server, UserCircle } from "lucide-react";
 import { PortfolioView } from "./views/PortfolioView";
 import { ActorProfileView } from "./views/ActorProfileView";
 import { FilmsView } from "./views/FilmsView";
@@ -209,7 +209,15 @@ function Shell() {
           className="fixed inset-0 z-50 bg-black/98 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in"
           onClick={() => ctx.setSelected(null)}
         >
-          <div className="max-w-full max-h-full animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-full max-h-full animate-scale-in relative group" onClick={(e) => e.stopPropagation()}>
+            <a
+              href={ctx.selected}
+              download="chitramaya-render"
+              className="absolute top-4 right-4 z-[60] w-12 h-12 rounded-full bg-black/60 hover:bg-emerald-600 text-white flex items-center justify-center backdrop-blur-md transition-all border border-white/20 opacity-0 group-hover:opacity-100"
+              title="Download high-res"
+            >
+              <Download className="w-6 h-6" />
+            </a>
             {ctx.selected.endsWith(".mp4") || ctx.selected.endsWith(".webm") ? (
               <video src={ctx.selected} controls autoPlay className="max-w-full max-h-[90vh] rounded-xl shadow-2xl shadow-black/80 ring-1 ring-white/[0.06]" />
             ) : (
