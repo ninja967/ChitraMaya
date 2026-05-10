@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>ChitraMaya: Advanced Cinematic Engine</title>
+    <meta name="description" content="An ultra-vibrant, high-quality presentation for ChitraMaya">
+    <meta name="author" content="Group-9">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <!-- Reveal.js Core CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.css">
+    
+    <!-- Ultra High-Quality Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* Ultra-Vibrant "Aurora Core" Theme */
+        :root {
+            --r-main-font: 'Inter', sans-serif;
+            --r-heading-font: 'Space Grotesk', sans-serif;
+            --r-heading-color: #ffffff;
+            --r-main-color: #f1f5f9; 
+            
+            /* Deep, rich background */
+            --bg-dark: #05020a;
+            --panel-bg: rgba(10, 5, 20, 0.75);
+            
+            /* Vibrant Accents */
+            --aurora-cyan: #22d3ee;
+            --aurora-violet: #a855f7;
+            --aurora-pink: #ec4899;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(168, 85, 247, 0.12), transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(34, 211, 238, 0.1), transparent 40%);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        #particles-js {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .reveal { z-index: 2; }
+
+        .reveal .slides section {
+            padding: 0;
+            height: 100%;
+        }
+
+        /* Ultra-Premium Glass Panels */
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(168, 85, 247, 0.25);
+            border-radius: 20px;
+            padding: 45px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), 
+                        inset 0 1px 1px rgba(255, 255, 255, 0.1);
+            text-align: left;
+            position: relative;
+        }
+
+        /* Glowing Edge Accents */
+        .glass-panel::before {
+            content: ''; position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+            width: 50%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--aurora-cyan), var(--aurora-violet), transparent);
+            opacity: 0.8;
+        }
+
+        /* Crisp Typography */
+        .reveal h1, .reveal h2, .reveal h3 { 
+            letter-spacing: -1px; 
+            margin-bottom: 25px; 
+            font-weight: 700; 
+            text-transform: none;
+        }
+        
+        .reveal h1 { font-size: 4.2em; font-weight: 900; letter-spacing: -2px; }
+        .reveal h2 { font-size: 2.6em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px;}
+        
+        /* Letter Quality Upgrade */
+        .reveal p, .reveal li { 
+            font-size: 1.15em; 
+            line-height: 1.8; 
+            color: var(--r-main-color); 
+            font-weight: 400;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5); /* Makes text pop off background */
+        }
+
+        /* Gradient Text Effects */
+        .text-gradient {
+            background: linear-gradient(135deg, var(--aurora-cyan) 0%, var(--aurora-violet) 50%, var(--aurora-pink) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: none; /* remove shadow for gradients */
+            font-weight: 900;
+        }
+
+        .highlight-cyan { color: var(--aurora-cyan); text-shadow: 0 0 15px rgba(34, 211, 238, 0.4); font-weight: 600;}
+        .highlight-violet { color: var(--aurora-violet); text-shadow: 0 0 15px rgba(168, 85, 247, 0.4); font-weight: 600;}
+
+        /* Code/Data Blocks */
+        .data-block {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            border-left: 4px solid var(--aurora-cyan);
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85em !important;
+            color: #e2e8f0;
+            margin-top: 20px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        .metric {
+            display: inline-block;
+            background: rgba(168, 85, 247, 0.15);
+            color: var(--aurora-cyan);
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85em;
+            margin-right: 12px;
+            border: 1px solid rgba(34, 211, 238, 0.3);
+            box-shadow: 0 0 10px rgba(34, 211, 238, 0.1);
+        }
+
+        /* Layouts */
+        .dashboard-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+            height: 100%;
+        }
+
+        /* 3D Perspective Images */
+        .perspective-container {
+            perspective: 1200px;
+            width: 100%;
+        }
+
+        .holo-image-3d {
+            width: 100%;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.15);
+            box-shadow: -20px 30px 50px rgba(0,0,0,0.8),
+                        0 0 0 2px rgba(168, 85, 247, 0.2);
+            transform: rotateY(-12deg) rotateX(4deg);
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s ease;
+        }
+
+        .holo-image-3d.right-tilt {
+            transform: rotateY(12deg) rotateX(4deg);
+            box-shadow: 20px 30px 50px rgba(0,0,0,0.8),
+                        0 0 0 2px rgba(34, 211, 238, 0.2);
+        }
+
+        .perspective-container:hover .holo-image-3d {
+            transform: rotateY(0deg) rotateX(0deg) scale(1.05);
+            border-color: var(--aurora-cyan);
+            box-shadow: 0 35px 70px rgba(34, 211, 238, 0.25);
+            z-index: 10;
+        }
+
+        .slide-number-custom {
+            position: absolute;
+            top: 25px; right: 25px;
+            font-family: 'Fira Code', monospace;
+            color: rgba(255,255,255,0.3);
+            font-size: 1.2em;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+    </style>
+</head>
+
+<body>
+    <div id="particles-js"></div>
+
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- SLIDE 1: Title -->
+            <section data-auto-animate>
+                <div class="glass-panel" style="text-align: center; margin-top: 10%;">
+                    <div class="slide-number-custom">01/15</div>
+                    <h1 data-id="main-title">Chitra<span class="text-gradient">Maya</span></h1>
+                    <h3 data-id="sub-title" style="color: #94A3B8; font-weight: 500;">The Autonomous Cinematic Engine</h3>
+                    
+                    <div style="margin-top: 50px;">
+                        <span class="metric">NODE: AMD MI300X</span>
+                        <span class="metric">VRAM: 192GB</span>
+                        <span class="metric">STATUS: LIVE</span>
+                    </div>
+                    <p style="font-size: 1.1rem; color: #cbd5e1; margin-top: 40px; letter-spacing: 6px; font-weight: 600;">ENGINEERED BY GROUP-9</p>
+                </div>
+            </section>
+
+            <!-- SLIDE 2: The Problem -->
+            <section data-auto-animate>
+                <div class="glass-panel" style="margin-top: 5%;">
+                    <div class="slide-number-custom">02/15</div>
+                    <h2 data-id="slide-heading">The <span class="text-gradient">Fragmented Reality</span></h2>
+                    <p>Current AI filmmaking workflows suffer from catastrophic fragmentation and massive data loss between disconnected tools.</p>
+                    <ul style="margin-top: 20px;">
+                        <li><strong>Context Loss:</strong> Moving from a LoRA trainer to an Image Generator strips away scene context.</li>
+                        <li><strong>Manual Routing:</strong> Creators must manually copy-paste seed numbers to maintain temporal consistency.</li>
+                        <li><strong>Resource Waste:</strong> Blindly generating text-to-video wastes immense GPU cycles on bad compositions.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- SLIDE 3: The Solution -->
+            <section data-auto-animate>
+                <div class="glass-panel" style="margin-top: 5%;">
+                    <div class="slide-number-custom">03/15</div>
+                    <h2 data-id="slide-heading">The <span class="highlight-cyan">Agent-Native</span> Architecture</h2>
+                    <p>ChitraMaya replaces manual routing with an autonomous <strong>FastAPI Control Plane.</strong></p>
+                    
+                    <div class="data-block">
+                        <span style="color: var(--aurora-violet);">// THE AGENTIC LOOP</span><br>
+                        <span style="color: var(--aurora-pink);">1.</span> User inputs unstructured intent ("Make a sci-fi scene").<br>
+                        <span style="color: var(--aurora-pink);">2.</span> FastAPI Agent parses intent into structured Project Metadata.<br>
+                        <span style="color: var(--aurora-pink);">3.</span> Agent dispatches perfectly formatted ComfyUI Prompt JSON to GPU.<br>
+                        <span style="color: var(--aurora-pink);">4.</span> GPU returns blob; Agent catalogs asset into PostgreSQL.<br>
+                        <span style="color: var(--aurora-pink);">5.</span> Human reviews.
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 4: Hardware -->
+            <section data-auto-animate>
+                <div class="glass-panel" style="margin-top: 5%;">
+                    <div class="slide-number-custom">04/15</div>
+                    <h2 data-id="slide-heading"><span class="highlight-violet">AMD MI300X</span> Powerhouse</h2>
+                    <p>To run an entire film studio without Out-Of-Memory (OOM) errors, we require massive compute.</p>
+                    
+                    <ul style="margin-top: 20px;">
+                        <li><span class="metric">192GB VRAM</span> Allows simultaneous loading of FLUX.1 + Wan 2.1 Video + LLMs.</li>
+                        <li><span class="metric">ROCm 6.0</span> Deep hardware integration for native PyTorch acceleration.</li>
+                        <li><span class="metric">Zero Offloading</span> Models never have to offload to CPU RAM, enabling 4x faster pipeline execution.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- SLIDE 5: Agent Dashboard -->
+            <section data-auto-animate>
+                <div class="dashboard-layout">
+                    <div class="text-content glass-panel" style="position: relative;">
+                        <div class="slide-number-custom">05/15</div>
+                        <h2 data-id="slide-heading">The <span class="text-gradient">Agent Dashboard</span></h2>
+                        <p>The UI is completely abstracted from the underlying node graphs.</p>
+                        <p>When a user selects "Image + Video", the React frontend sends a REST payload to the Python Orchestrator. The Orchestrator resolves dependencies and queues the tasks asynchronously.</p>
+                    </div>
+                    <div class="perspective-container">
+                        <img data-id="dashboard-img" src="agent_dashboard.png" class="holo-image-3d" alt="Agent Dashboard">
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 6: Project Concept -->
+            <section data-auto-animate>
+                <div class="glass-panel" style="margin-top: 5%;">
+                    <div class="slide-number-custom">06/15</div>
+                    <h2 data-id="slide-heading">The <span class="highlight-violet">Project Pipeline</span> Concept</h2>
+                    <p>Professional rendering requires strict metadata enforcement.</p>
+                    
+                    <div class="data-block">
+                        {<br>
+                        &nbsp;&nbsp;<span style="color: var(--aurora-cyan);">"project_id"</span>: <span style="color: #cbd5e1;">"prj_9x2bV"</span>,<br>
+                        &nbsp;&nbsp;<span style="color: var(--aurora-cyan);">"aspect_ratio"</span>: <span style="color: #cbd5e1;">"16:9"</span>,<br>
+                        &nbsp;&nbsp;<span style="color: var(--aurora-cyan);">"target_fps"</span>: <span style="color: var(--aurora-pink);">24</span>,<br>
+                        &nbsp;&nbsp;<span style="color: var(--aurora-cyan);">"linked_identity_lora"</span>: <span style="color: #cbd5e1;">"maya_prototype_v1"</span><br>
+                        }
+                    </div>
+                    <p style="margin-top: 20px;">By enforcing a Project structure, the Agent ensures every generated shot automatically inherits the correct aspect ratio and LoRA styling.</p>
+                </div>
+            </section>
+
+            <!-- SLIDE 7: Project Execution -->
+            <section data-auto-animate>
+                <div class="dashboard-layout" style="grid-template-columns: 1fr 1fr;">
+                    <div class="perspective-container">
+                        <img data-id="dashboard-img" src="project_pipeline.png" class="holo-image-3d right-tilt" alt="Project Pipeline">
+                    </div>
+                    <div class="text-content glass-panel" style="position: relative;">
+                        <div class="slide-number-custom">07/15</div>
+                        <h2 data-id="slide-heading">Pipeline <span class="highlight-cyan">Execution</span></h2>
+                        <p>The "Alchemist Lab" pipeline view provides a complete audit trail.</p>
+                        <p>The PostgreSQL backend tracks state transitions. Jobs move from <code>DRAFT</code> → <code>QUEUED</code> → <code>RENDERING</code> → <code>REVIEW</code>. The time elapsed is calculated on the server to prevent client-side desync.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 8: Scene Builder -->
+            <section data-auto-animate>
+                <div class="dashboard-layout">
+                    <div class="text-content glass-panel" style="position: relative;">
+                        <div class="slide-number-custom">08/15</div>
+                        <h2 data-id="slide-heading">The <span class="text-gradient">Scene Builder</span></h2>
+                        <p>Deconstructing the script into executable GPU threads.</p>
+                        <p>Each shot card represents a separate generation request. The backend calculates the optimal batch size based on available VRAM, executing multiple independent shots in parallel if resources allow.</p>
+                    </div>
+                    <div class="perspective-container">
+                        <img data-id="dashboard-img" src="scene_builder.png" class="holo-image-3d" alt="Scene Builder">
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 9: Visual Engine Pipeline -->
+            <section data-auto-animate>
+                <div class="glass-panel" style="margin-top: 5%;">
+                    <div class="slide-number-custom">09/15</div>
+                    <h2 data-id="slide-heading"><span class="highlight-cyan">FLUX.1</span> to <span class="highlight-cyan">Wan 2.1</span> Pipeline</h2>
+                    <p>Direct Text-to-Video is computationally wasteful. We enforce Image-to-Video routing.</p>
+                    
+                    <div class="data-block" style="border-left-color: var(--aurora-pink);">
+                        <span style="color: var(--aurora-pink);">// COMPUTE SAVINGS ANALYSIS</span><br>
+                        Bad Video Render: 100% GPU load for 3 mins -> Trash.<br>
+                        Image Render (FLUX): 100% GPU load for 8 seconds -> Human Approves.<br>
+                        Video Render (Wan2.1): 100% GPU load for 3 mins -> Guaranteed Perfect Framing.<br>
+                        <br>
+                        <span style="color: var(--aurora-cyan); font-weight: bold;">=> Compute Waste reduced by ~95%.</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 10: LoRA Training -->
+            <section data-auto-animate>
+                <div class="dashboard-layout" style="grid-template-columns: 1fr 1fr;">
+                    <div class="perspective-container">
+                        <img data-id="dashboard-img" src="lora_training.png" class="holo-image-3d right-tilt" alt="LoRA Training Wizard">
+                    </div>
+                    <div class="text-content glass-panel" style="position: relative;">
+                        <div class="slide-number-custom">10/15</div>
+                        <h2 data-id="slide-heading"><span class="text-gradient">Identity LoRA</span> Tuning</h2>
+                        <p>Running <code>ai-toolkit</code> directly on the AMD cluster.</p>
+                        <p>The backend accepts a `.zip` of 10-20 images, extracts them, injects the trigger word into the configuration YAML, and spawns a background training process using ROCm. The resulting `.safetensors` file is instantly mounted to the inference pipeline.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 11: Live Node Tracking -->
+            <section data-auto-animate>
+                <div class="dashboard-layout">
+                    <div class="text-content glass-panel" style="position: relative;">
+                        <div class="slide-number-custom">11/15</div>
+                        <h2 data-id="slide-heading">Live <span class="highlight-cyan">Node Telemetry</span></h2>
+                        <p>The dashboard continuously polls the hardware state.</p>
+                        <ul style="margin-top: 20px;">
+                            <li><strong>VRAM:</strong> <code>37.3 GB / 205.8 GB</code> actively used.</li>
+                            <li><strong>Queue:</strong> Real-time tracking of pending tasks.</li>
+                        </ul>
+                        <p style="margin-top: 20px;">This telemetry ensures the Orchestrator never sends a job that would exceed the physical memory limits of the droplet.</p>
+                    </div>
+                    <div class="perspective-container">
+                        <img data-id="dashboard-img" src="gpu_nodes.png" class="holo-image-3d" alt="GPU Nodes">
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 12: Provenance -->
+            <section data-auto-animate>
+                <div class="glass-panel" style="margin-top: 5%;">
+                    <div class="slide-number-custom">12/15</div>
+                    <h2 data-id="slide-heading">Asset <span class="highlight-violet">Provenance</span></h2>
+                    <p>Every asset generated is mathematically reproducible.</p>
+                    
+                    <div class="data-block">
+                        {<br>
+                        &nbsp;&nbsp;<span style="color: var(--aurora-cyan);">"asset_id"</span>: <span style="color: #cbd5e1;">"img_8xLp2"</span>,<br>
+                        &nbsp;&nbsp;<span style="color: var(--aurora-cyan);">"seed"</span>: <span style="color: var(--aurora-pink);">482910482</span>,<br>
+                        &nbsp;&nbsp;<span style="color: var(--aurora-cyan);">"sampler"</span>: <span style="color: #cbd5e1;">"euler_ancestral"</span>,<br>
+                        &nbsp;&nbsp;<span style="color: var(--aurora-cyan);">"scheduler"</span>: <span style="color: #cbd5e1;">"normal"</span>,<br>
+                        &nbsp;&nbsp;<span style="color: var(--aurora-cyan);">"cfg_scale"</span>: <span style="color: var(--aurora-pink);">4.5</span><br>
+                        }
+                    </div>
+                    <p style="margin-top: 20px;">If a Director loves a frame, the precise generation parameters are saved forever, allowing exact replication or subtle variations.</p>
+                </div>
+            </section>
+
+            <!-- SLIDE 13: Gallery Screenshot -->
+            <section data-auto-animate>
+                <div style="text-align: center; margin-bottom: 20px; position: relative;">
+                    <div class="slide-number-custom" style="right: 50px;">13/15</div>
+                    <h2 data-id="slide-heading">High-Fidelity <span class="text-gradient">Results</span></h2>
+                </div>
+                <div class="perspective-container">
+                    <img data-id="dashboard-img" src="gallery.png" class="holo-image-3d" style="max-height: 60vh; object-fit: cover; transform: rotateX(5deg);" alt="Gallery">
+                </div>
+            </section>
+
+            <!-- SLIDE 14: Proxy Architecture -->
+            <section data-auto-animate>
+                <div class="glass-panel" style="margin-top: 5%;">
+                    <div class="slide-number-custom">14/15</div>
+                    <h2 data-id="slide-heading">The <span class="highlight-violet">Proxy Bridge</span> Architecture</h2>
+                    <p>Seamlessly connecting public UIs to private GPU clusters.</p>
+                    
+                    <ul style="margin-top: 20px;">
+                        <li><span class="metric">Hugging Face Space</span> Hosts the React/Vite Frontend.</li>
+                        <li><span class="metric">Node.js Express Proxy</span> Sits on Hugging Face, intercepting API calls and forwarding them to the hidden Droplet IP.</li>
+                        <li><span class="metric">Server-Sent Events (SSE)</span> Maintains an open connection to stream live generation progress (e.g., "55% rendered") back to the user's browser with `< 50ms` latency.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- SLIDE 15: Conclusion -->
+            <section data-auto-animate>
+                <div class="glass-panel" style="text-align: center; margin-top: 10%;">
+                    <div class="slide-number-custom">15/15</div>
+                    <h1 data-id="main-title" style="font-size: 3.8em;">The Future is <span class="text-gradient">Agentic</span></h1>
+                    <p style="margin-top: 30px; margin-bottom: 50px; font-size: 1.4em; font-weight: 500;">ChitraMaya bridges the gap between raw AMD GPU compute and human creativity.</p>
+                    
+                    <div style="display: flex; justify-content: center; gap: 50px; font-family: 'Fira Code', monospace; font-size: 0.9em;">
+                        <div style="background: rgba(0,0,0,0.6); padding: 20px 35px; border-radius: 12px; border: 1px solid rgba(34,211,238,0.4); box-shadow: 0 10px 20px rgba(0,0,0,0.5);">
+                            <span style="color: #94A3B8;">// LIVE SECURE DEMO</span><br>
+                            <span class="highlight-cyan" style="font-size: 1.1em;">huggingface.co/spaces/Sarathpavan/ChitraMaya</span>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.6); padding: 20px 35px; border-radius: 12px; border: 1px solid rgba(168,85,247,0.4); box-shadow: 0 10px 20px rgba(0,0,0,0.5);">
+                            <span style="color: #94A3B8;">// OPEN SOURCE REPOSITORY</span><br>
+                            <span class="highlight-violet" style="font-size: 1.1em;">github.com/ninja967/ChitraMaya</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    
+    <script>
+        // Initialize Reveal.js
+        Reveal.initialize({
+            hash: true,
+            controls: true,
+            progress: true,
+            center: false,
+            transition: 'slide',
+            backgroundTransition: 'fade',
+            width: 1400,
+            height: 800,
+            margin: 0.08,
+            minScale: 0.2,
+            maxScale: 2.0,
+            autoAnimateEasing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+            autoAnimateDuration: 1.0
+        });
+
+        // Vibrant Aurora Particles Configuration
+        particlesJS("particles-js", {
+            "particles": {
+                "number": { "value": 70, "density": { "enable": true, "value_area": 800 } },
+                "color": { "value": ["#22d3ee", "#a855f7", "#ec4899"] }, // Cyan, Violet, Pink
+                "shape": { "type": "circle" },
+                "opacity": { "value": 0.8, "random": true },
+                "size": { "value": 4, "random": true },
+                "line_linked": {
+                    "enable": true,
+                    "distance": 160,
+                    "color": "#a855f7",
+                    "opacity": 0.4,
+                    "width": 2
+                },
+                "move": {
+                    "enable": true,
+                    "speed": 5.0, // Kept the fast speed as requested earlier
+                    "direction": "none",
+                    "random": true,
+                    "straight": false,
+                    "out_mode": "out",
+                    "bounce": false
+                }
+            },
+            "interactivity": {
+                "detect_on": "canvas",
+                "events": {
+                    "onhover": { "enable": true, "mode": "grab" },
+                    "onclick": { "enable": true, "mode": "push" },
+                    "resize": true
+                },
+                "modes": {
+                    "grab": { "distance": 250, "line_linked": { "opacity": 0.8, "color": "#22d3ee" } }
+                }
+            },
+            "retina_detect": true
+        });
+    </script>
+</body>
+</html>
