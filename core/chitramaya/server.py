@@ -933,9 +933,9 @@ async def generate_project_shot_image(project_id: str, scene_id: str, shot_id: s
     if shot.get("status") in {"rendering_image", "animating"}:
         raise HTTPException(status_code=409, detail="Shot is already rendering")
 
-    prompt = shot.get("image_prompt") or shot.get("text")
+    prompt = shot.get("image_prompt") or shot.get("description") or shot.get("text")
     if not prompt:
-        raise HTTPException(status_code=400, detail="Shot image_prompt or text is required")
+        raise HTTPException(status_code=400, detail="Shot image_prompt, description, or text is required")
 
     character_ids = await _project_character_ids(project_id, scene_id, shot)
     resolved = await _resolve_characters(None, _character_bindings_from_ids(character_ids))
@@ -993,9 +993,9 @@ async def animate_project_shot(project_id: str, scene_id: str, shot_id: str) -> 
         raise HTTPException(status_code=404, detail="Shot not found")
     if shot.get("status") in {"rendering_image", "animating"}:
         raise HTTPException(status_code=409, detail="Shot is already rendering")
-    prompt = shot.get("motion_prompt") or shot.get("text") or shot.get("image_prompt")
+    prompt = shot.get("motion_prompt") or shot.get("description") or shot.get("text") or shot.get("image_prompt")
     if not prompt:
-        raise HTTPException(status_code=400, detail="Shot motion_prompt, text, or image_prompt is required")
+        raise HTTPException(status_code=400, detail="Shot motion_prompt, description, text, or image_prompt is required")
 
     character_ids = await _project_character_ids(project_id, scene_id, shot)
     resolved = await _resolve_characters(None, _character_bindings_from_ids(character_ids))
