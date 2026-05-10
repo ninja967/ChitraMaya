@@ -127,7 +127,10 @@ export function FilmDetailView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
-      if (!response.ok) throw new Error(`Project patch failed: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Project update failed (${response.status})`);
+      }
       await onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save project");
@@ -144,7 +147,10 @@ export function FilmDetailView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
-      if (!response.ok) throw new Error(`Scene patch failed: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Scene update failed (${response.status})`);
+      }
       await onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save scene");
@@ -163,7 +169,10 @@ export function FilmDetailView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
-      if (!response.ok) throw new Error(`Patch failed: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Shot update failed (${response.status})`);
+      }
       await onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save shot");
@@ -182,8 +191,10 @@ export function FilmDetailView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ shot_number: next, description: "" }),
       });
-      if (!response.ok) throw new Error(`Add shot failed: ${response.status}`);
-      const created = await response.json();
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Add shot failed (${response.status})`);
+      }
       await onRefresh();
       onSelectShot(created.id);
     } catch (e) {
@@ -198,7 +209,10 @@ export function FilmDetailView({
     setSaving(true);
     try {
       const response = await fetch(`/api/projects/${project.id}/scenes/${shot.scene_id}/shots/${shot.id}/generate-image`, { method: "POST" });
-      if (!response.ok) throw new Error(`Generate failed: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Generation failed (${response.status})`);
+      }
       await onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to generate image");
@@ -212,7 +226,10 @@ export function FilmDetailView({
     setSaving(true);
     try {
       const response = await fetch(`/api/projects/${project.id}/scenes/${shot.scene_id}/shots/${shot.id}/animate`, { method: "POST" });
-      if (!response.ok) throw new Error(`Animate failed: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Animation failed (${response.status})`);
+      }
       await onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to animate");

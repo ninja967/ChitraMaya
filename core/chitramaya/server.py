@@ -36,10 +36,22 @@ async def broadcast_event(event_type: str, data: dict[str, Any]) -> None:
         await queue.put(payload)
 
 
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await init_db()
+    # Sync first 100 media items on start to ensure gallery is populated
+    asyncio.create_task(_sync_filesystem_media(limit=100))
+    yield
+    # Shutdown
+    await close_db()
+
+
 app = FastAPI(
     title="ChitraMaya Engine API",
     description="Agent-native API for driving ComfyUI video generation on AMD GPUs.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 

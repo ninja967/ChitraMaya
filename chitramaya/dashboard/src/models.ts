@@ -96,10 +96,12 @@ export interface Shot {
   project_id: string;
   scene_id: string;
   shot_number: number;
+  title: string | null;
   text: string | null;
   description: string | null;
   subtitle: string | null;
   voiceover: string | null;
+  speaker: string | null;
   image_prompt: string | null;
   motion_prompt: string | null;
   camera_motion: string | null;

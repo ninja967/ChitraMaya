@@ -11,7 +11,7 @@ import asyncpg
 from .settings import get_settings
 
 _pool: asyncpg.Pool | None = None
-_MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
+_MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "schema"
 
 
 def get_pool() -> asyncpg.Pool:

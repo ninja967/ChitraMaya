@@ -383,8 +383,13 @@ export default function App() {
       try {
         const data = JSON.parse(e.data);
         setRenderEvents((prev) => [data, ...prev].slice(0, 50));
-        if (data.type === "job_update" && (data.status === "completed" || data.status === "failed")) {
-          load();
+        if (data.type === "job_update") {
+          if (data.status === "completed" || data.status === "failed") {
+            load();
+            if (data.project_id) {
+              loadProject(data.project_id);
+            }
+          }
         }
       } catch (err) {
         console.error("SSE parse error", err);
