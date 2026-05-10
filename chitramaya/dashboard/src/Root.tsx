@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { BrowserRouter, Routes, Route, Outlet, useMatch, useNavigate, useParams } from "react-router-dom";
-import { Activity, Menu, Server, UserCircle } from "lucide-react";
+import { Activity, Loader2, Menu, Server, UserCircle } from "lucide-react";
 import { PortfolioView } from "./views/PortfolioView";
 import { ActorProfileView } from "./views/ActorProfileView";
 import { FilmsView } from "./views/FilmsView";
@@ -46,6 +46,7 @@ interface AppContextType {
   addScene: () => Promise<void>;
   deleteScene: (sceneId: string) => Promise<void>;
   deleteShot: (shotId: string) => Promise<void>;
+  renderEvents: any[];
 }
 
 const AppContext = createContext<AppContextType>(null!);
@@ -202,7 +203,6 @@ function Shell() {
         </main>
       </div>
 
-      {/* Lightbox */}
       {/* ── Cinematic Lightbox ── */}
       {ctx.selected && (
         <div
@@ -218,6 +218,35 @@ function Shell() {
           </div>
         </div>
       )}
+
+      {/* ── Real-time Render Progress Overlay ── */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
+        {ctx.renderEvents
+          .filter((e) => e.type === "job_update" && e.status === "rendering")
+          .slice(0, 1)
+          .map((event) => (
+            <div
+              key={event.job_id}
+              className="w-80 glass-heavy border border-emerald-500/30 rounded-2xl p-4 shadow-2xl shadow-black pointer-events-auto animate-slide-up"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Rendering Film
+                </span>
+                <span className="text-[10px] font-mono text-emerald-300/60">{event.progress}%</span>
+              </div>
+              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500 ease-out"
+                  style={{ width: `${event.progress}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-gray-400 mt-2 font-medium truncate">
+                {event.message || "Processing shots..."}
+              </p>
+            </div>
+          ))}
+      </div>
     </div>
   );
 }
@@ -316,6 +345,7 @@ export default function App() {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [renderEvents, setRenderEvents] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     if (!hasLoadedOnce) setLoading(true);
@@ -347,7 +377,24 @@ export default function App() {
   useEffect(() => {
     load();
     const id = window.setInterval(load, 5000);
-    return () => window.clearInterval(id);
+
+    const es = new EventSource("/api/events");
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        setRenderEvents((prev) => [data, ...prev].slice(0, 50));
+        if (data.type === "job_update" && (data.status === "completed" || data.status === "failed")) {
+          load();
+        }
+      } catch (err) {
+        console.error("SSE parse error", err);
+      }
+    };
+
+    return () => {
+      window.clearInterval(id);
+      es.close();
+    };
   }, [load]);
 
   const loadProject = useCallback(async (id: string) => {
@@ -462,6 +509,7 @@ export default function App() {
     addScene,
     deleteScene,
     deleteShot,
+    renderEvents,
   };
 
   return (

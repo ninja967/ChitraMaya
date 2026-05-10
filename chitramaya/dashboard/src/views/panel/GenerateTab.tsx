@@ -88,6 +88,7 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
   const [steps, setSteps] = useState(20);
   const [guidance, setGuidance] = useState(4);
   const [loraStrength, setLoraStrength] = useState(1);
+  const [durationSeconds, setDurationSeconds] = useState(5);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -192,6 +193,7 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
             character: useCharacter ? characterId : undefined,
             image: mode === "i2v" ? sourceImage.trim() : undefined,
             prompt: cleanPrompt, width, height,
+            duration_seconds: durationSeconds,
             filename_prefix: filenamePrefix, submit: true,
           };
       const response = await fetch(endpoint, {
@@ -447,6 +449,9 @@ export function GenerateTab({ checkpoints, onQueued }: GenerateTabProps) {
           <SliderField label="Height" value={height} onChange={setHeight} min={512} max={2048} step={64} unit="px" />
           {mode === "image" && <SliderField label="Steps" value={steps} onChange={setSteps} min={1} max={60} step={1} />}
           {mode === "image" && <SliderField label="Guidance" value={guidance} onChange={setGuidance} min={1} max={10} step={0.5} />}
+          {mode !== "image" && (
+            <SliderField label="Duration" value={durationSeconds} onChange={setDurationSeconds} min={1} max={15} step={1} unit="s" />
+          )}
         </div>
         {mode === "image" && (
           <SliderField label="LoRA Strength" value={loraStrength} onChange={setLoraStrength} min={0} max={2} step={0.05} />

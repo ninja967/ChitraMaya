@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChitraMaya - Agent-Native Cinematic Engine</title>
+    <style>
+        :root {
+            --bg-base: #09090b;
+            --bg-surface: rgba(24, 24, 27, 0.6);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-primary: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.5);
+            --accent-red: #ef4444;
+            --border-subtle: rgba(255, 255, 255, 0.1);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(239, 68, 68, 0.05), transparent 25%);
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease-in-out, visibility 0.5s;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 4rem;
+            box-sizing: border-box;
+        }
+
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .content-container {
+            max-width: 1000px;
+            width: 100%;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 4.5rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        h2 {
+            font-size: 3rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 2rem;
+            color: var(--text-main);
+        }
+
+        p {
+            font-size: 1.5rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        .subtitle {
+            font-size: 2rem;
+            color: var(--accent-primary);
+            font-weight: 600;
+            margin-bottom: 3rem;
+        }
+
+        .analogy-box {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-left: 4px solid #8b5cf6;
+            padding: 2rem;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            margin-top: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .analogy-box p {
+            margin: 0;
+            font-size: 1.6rem;
+            color: #e2e8f0;
+        }
+
+        .trigger-box {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-top: 4px solid var(--accent-red);
+            padding: 2.5rem;
+            border-radius: 12px;
+            margin-top: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            margin-top: 2rem;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        li::before {
+            content: '→';
+            color: var(--accent-primary);
+            font-weight: bold;
+            margin-right: 1rem;
+        }
+
+        .hardware-badge {
+            display: inline-block;
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 0.5rem 1rem;
+            border-radius: 100px;
+            font-size: 1rem;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-red));
+            transition: width 0.3s ease;
+            z-index: 100;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            display: flex;
+            gap: 1rem;
+            z-index: 100;
+            background: var(--bg-surface);
+            padding: 0.5rem;
+            border-radius: 100px;
+            border: 1px solid var(--border-subtle);
+            backdrop-filter: blur(10px);
+        }
+
+        button {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0.5rem 1rem;
+            border-radius: 100px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+
+        .slide-counter {
+            position: fixed;
+            bottom: 2.5rem;
+            left: 2rem;
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Slide 1: Title -->
+    <div class="slide active" id="slide-1">
+        <div class="content-container" style="text-align: center;">
+            <div class="hardware-badge">Built on AMD MI300X & ROCm</div>
+            <h1>ChitraMaya</h1>
+            <div class="subtitle">The Agent-Native Cinematic Engine</div>
+            <p>An autonomous film studio orchestrated by AI,<br>powered by bare-metal AMD compute.</p>
+        </div>
+    </div>
+
+    <!-- Slide 2: Problem -->
+    <div class="slide" id="slide-2">
+        <div class="content-container">
+            <h2>The Problem</h2>
+            <p>Right now, creating a cohesive AI video requires jumping between a dozen disjointed tools. You train a LoRA here, generate images there, and prompt video in a Discord bot.</p>
+            
+            <div class="analogy-box">
+                <p><strong>The Analogy:</strong> It’s like trying to direct a blockbuster movie, but your actors, cameras, and set designers are all on different continents and don't speak the same language.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Solution -->
+    <div class="slide" id="slide-3">
+        <div class="content-container">
+            <h2>The "Agent-Director"</h2>
+            <p>ChitraMaya is not just a UI. It is an <strong>Agent-Native control plane</strong>.</p>
+            <p>We built a single studio environment where an autonomous AI Agent orchestrates the entire production pipeline. You give the Agent a script; it directs the tools.</p>
+            
+            <div class="trigger-box">
+                <h3 style="margin-top: 0; color: white;">The "Pocket Rulebook"</h3>
+                <p style="margin-bottom: 0;">The AI Agent doesn't guess how to make a video. It reads our strict FastAPI OpenAPI specs, understands the MI300X pipeline, and seamlessly dispatches complex multi-shot jobs.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: Hardware -->
+    <div class="slide" id="slide-4">
+        <div class="content-container">
+            <div class="hardware-badge">Infrastructure</div>
+            <h2>The AMD Advantage</h2>
+            <p>To run an entire film studio locally, you need a very big lot.</p>
+            
+            <div class="grid-2">
+                <div>
+                    <ul>
+                        <li><strong>192GB VRAM:</strong> No OOM errors. We run FLUX.2, LLMs, and Wan 2.2 simultaneously.</li>
+                        <li><strong>ROCm 6.x:</strong> Flawless native PyTorch compute without relying on CUDA.</li>
+                        <li><strong>Instant Context Switching:</strong> The agent leaps from image to video generation without unloading models.</li>
+                    </ul>
+                </div>
+                <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 2rem;">
+                    <h3 style="margin-top:0; color: var(--accent-red);">The Stack</h3>
+                    <p style="font-size: 1.2rem;"><strong>Compute:</strong> AMD MI300X</p>
+                    <p style="font-size: 1.2rem;"><strong>API:</strong> FastAPI / Python</p>
+                    <p style="font-size: 1.2rem;"><strong>Engines:</strong> ComfyUI, ai-toolkit</p>
+                    <p style="font-size: 1.2rem;"><strong>UI:</strong> React 18, Vite</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: Fine Tuning -->
+    <div class="slide" id="slide-5">
+        <div class="content-container">
+            <h2>Track 2: Fine-Tuning</h2>
+            <div class="subtitle">Custom Identity LoRAs via ROCm</div>
+            
+            <p>We built a native training wizard directly into the dashboard.</p>
+            <ul>
+                <li>Upload a .zip dataset of your actor or character.</li>
+                <li>The backend dispatches an ai-toolkit job directly to the AMD MI300X.</li>
+                <li>Trains a high-fidelity FLUX.2 LoRA in roughly 90 minutes.</li>
+                <li>The Agent immediately knows how to inject this LoRA into your video pipelines.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Slide 6: Hugging Face -->
+    <div class="slide" id="slide-6">
+        <div class="content-container">
+            <h2>Hugging Face Integration</h2>
+            <p>While the heavy lifting happens on the AMD bare metal, the user experience lives smoothly in the cloud.</p>
+            
+            <div class="analogy-box" style="border-left-color: #facc15;">
+                <p><strong>The Bridge:</strong> We use a Dockerized Hugging Face Space to host our React frontend. A secure websocket proxy bridges the user's browser directly to the remote MI300X server, streaming live generation progress.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 7: Business Model -->
+    <div class="slide" id="slide-7">
+        <div class="content-container">
+            <h2>Business & Scalability</h2>
+            
+            <div class="grid-2">
+                <div>
+                    <h3 style="color: white;">Business Model</h3>
+                    <ul>
+                        <li><strong>B2B Enterprise:</strong> Licensing the agentic backend to creative studios running private AMD hardware.</li>
+                        <li><strong>Cloud SaaS:</strong> Tiered subscriptions for indie filmmakers on Hugging Face Spaces.</li>
+                        <li><strong>Marketplace:</strong> A hub to buy/sell custom LoRAs.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 style="color: white;">Future Scale</h3>
+                    <ul>
+                        <li><strong>Distributed Rendering:</strong> Scaling FastAPI to dispatch jobs across multi-node MI300X clusters.</li>
+                        <li><strong>Audio Agents:</strong> Integrating AudioCraft for automatic foley and sound effects.</li>
+                        <li><strong>Real-time Canvas:</strong> Moving from async queues to real-time interactivity.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: End -->
+    <div class="slide" id="slide-8">
+        <div class="content-container" style="text-align: center;">
+            <h1>Thank You.</h1>
+            <div class="subtitle">The future of film is Agentic.</div>
+            <p style="margin-bottom: 0.5rem;"><strong>GitHub:</strong> github.com/ninja967/ChitraMaya</p>
+            <p><strong>Live Demo:</strong> huggingface.co/spaces/Sarathpavan/ChitraMaya</p>
+        </div>
+    </div>
+
+    <!-- UI Elements -->
+    <div class="progress-bar" id="progress-bar" style="width: 12.5%;"></div>
+    <div class="slide-counter"><span id="current-slide">1</span> / <span id="total-slides">8</span></div>
+    
+    <div class="controls">
+        <button onclick="prevSlide()">← Prev</button>
+        <button onclick="nextSlide()">Next →</button>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = document.querySelectorAll('.slide').length;
+        document.getElementById('total-slides').innerText = totalSlides;
+
+        function updateSlide() {
+            // Hide all slides
+            document.querySelectorAll('.slide').forEach(slide => {
+                slide.classList.remove('active');
+            });
+            
+            // Show current slide
+            document.getElementById('slide-' + currentSlide).classList.add('active');
+            
+            // Update UI
+            document.getElementById('current-slide').innerText = currentSlide;
+            document.getElementById('progress-bar').style.width = ((currentSlide) / totalSlides) * 100 + '%';
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                currentSlide++;
+                updateSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                currentSlide--;
+                updateSlide();
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -11,12 +11,13 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, urlparse, urlunparse
 
 import httpx
 import websockets
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel, Field
 
 from .bridge import ComfyClient
@@ -24,11 +25,119 @@ from .settings import ComfyNode, get_settings
 from .store import close_db, delete_character, delete_media_rows, delete_project, delete_project_scene, delete_project_shot, get_character, get_job, get_project, get_project_scene, get_project_shot, get_project_shot_version, get_project_shot_version_by_prompt, init_db, list_characters, list_jobs, list_media, list_project_scenes, list_project_shot_versions, list_project_shots, list_projects, media_count, next_shot_version_number, save_job, update_job_metadata, update_job_status, upsert_character, upsert_media, upsert_project, upsert_project_scene, upsert_project_shot, upsert_project_shot_version, utc_from_timestamp
 from .pipelines import WAN_NEGATIVE, build_flux2_lora_image, build_wan22_i2v, build_wan22_t2v
 
+# ── SSE Events ──
+_event_queues: list[asyncio.Queue] = []
+
+
+async def broadcast_event(event_type: str, data: dict[str, Any]) -> None:
+    """Send an event to all connected SSE clients."""
+    payload = json.dumps({"type": event_type, "timestamp": datetime.now(UTC).isoformat(), **data})
+    for queue in _event_queues:
+        await queue.put(payload)
+
+
 app = FastAPI(
     title="ChitraMaya Engine API",
     description="Agent-native API for driving ComfyUI video generation on AMD GPUs.",
     version="0.1.0",
 )
+
+
+@app.get("/api/events")
+async def events(request: Request):
+    """Server-Sent Events endpoint for real-time job and node updates."""
+
+    async def event_generator():
+        queue = asyncio.Queue()
+        _event_queues.append(queue)
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                data = await queue.get()
+                yield f"data: {data}\n\n"
+        finally:
+            if queue in _event_queues:
+                _event_queues.remove(queue)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.get("/api/tts/voices")
+async def list_tts_voices() -> dict[str, Any]:
+    """List available ElevenLabs voices for TTS."""
+    voices = await _tts_voices()
+    return {"voices": voices}
+
+
+# ── ElevenLabs TTS ──
+ELEVENLABS_VOICE_ID = "CwhRBWXzGAHq8TQ4Fs17"  # Roger — Laid-Back, Casual, Resonant
+
+
+async def _generate_tts(text: str, output_path: Path, voice_id: str | None = None, voice_settings: VoiceConfig | None = None) -> tuple[bool, float | None]:
+    """Generate TTS audio via ElevenLabs with-timestamps endpoint."""
+    settings = get_settings()
+    api_key = settings.elevenlabs_api_key
+    if not api_key:
+        return False, None
+    payload: dict[str, Any] = {
+        "text": text,
+        "model_id": "eleven_multilingual_v2",
+    }
+    vs = voice_settings.model_dump() if voice_settings else {}
+    payload["voice_settings"] = {
+        "stability": vs.get("stability", 0.6),
+        "similarity_boost": vs.get("similarity_boost", 0.8),
+        "style": vs.get("style", 0.2),
+        "use_speaker_boost": vs.get("use_speaker_boost", True),
+    }
+    import base64
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            resp = await client.post(
+                f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id or ELEVENLABS_VOICE_ID}/with-timestamps",
+                headers={"xi-api-key": api_key, "Content-Type": "application/json"},
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            audio_bytes = base64.b64decode(data["audio_base64"])
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(audio_bytes)
+            alignment = data["alignment"]
+            end_times = alignment["character_end_times_seconds"]
+            speech_end = float(end_times[-1])
+            return True, speech_end
+        except Exception:
+            return False, None
+
+
+async def _tts_voices() -> list[dict[str, Any]]:
+    """List available ElevenLabs voices."""
+    settings = get_settings()
+    api_key = settings.elevenlabs_api_key
+    if not api_key:
+        return []
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(
+                "https://api.elevenlabs.io/v1/voices",
+                headers={"xi-api-key": api_key},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return [
+                {
+                    "voice_id": v.get("voice_id"),
+                    "name": v.get("name"),
+                    "category": v.get("category"),
+                    "labels": v.get("labels", {}),
+                    "description": v.get("description"),
+                }
+                for v in data.get("voices", [])
+            ]
+    except Exception:
+        return []
 
 
 class CharacterBinding(BaseModel):
@@ -45,12 +154,21 @@ class CharacterLoraBinding(BaseModel):
     base_model: str | None = None
 
 
+class VoiceConfig(BaseModel):
+    voice_id: str | None = None
+    stability: float = 0.5
+    similarity_boost: float = 0.75
+    style: float = 0.0
+    use_speaker_boost: bool = True
+
+
 class CharacterRecord(BaseModel):
     id: str = Field(min_length=1, pattern=r"^[a-zA-Z0-9_-]+$")
     name: str = Field(min_length=1)
     kind: Literal["human", "agent"] | None = None
     trigger: str | None = None
     description: str | None = None
+    voice: VoiceConfig | None = None
     source_images: list[str] = Field(default_factory=list)
     loras: list[CharacterLoraBinding] = Field(default_factory=list)
     defaults: dict[str, Any] = Field(default_factory=dict)
@@ -65,6 +183,7 @@ class ProjectRecord(BaseModel):
     duration_seconds: int | None = None
     status: str = "draft"
     characters: list[str] = Field(default_factory=list)
+    narrator_voice: VoiceConfig | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -105,6 +224,7 @@ class ShotRecord(BaseModel):
     description: str | None = None
     subtitle: str | None = None
     voiceover: str | None = None
+    speaker: str | None = None  # "narrator" or character_id
     image_prompt: str | None = None
     motion_prompt: str | None = None
     camera_motion: str | None = None
@@ -128,6 +248,7 @@ class VideoGenerateRequest(BaseModel):
     width: int = 1280
     height: int = 720
     length: int = Field(default=81, description="Frame count, not seconds (81 = ~5s)")
+    duration_seconds: int | None = Field(default=None, description="Set duration in seconds (overrides length if provided)")
     fps: int = 16
     seed: int | None = None
     filename_prefix: str = "videos"
@@ -463,6 +584,25 @@ def _character_reference_image(binding: CharacterBinding, record: dict[str, Any]
     return images[0] if images else None
 
 
+async def _resolve_voice(speaker: str | None, project: dict[str, Any]) -> tuple[str | None, VoiceConfig | None]:
+    """Return (voice_id, voice_settings) for a speaker."""
+    if not speaker or speaker == "narrator":
+        nv = project.get("narrator_voice")
+        if nv:
+            if isinstance(nv, dict):
+                return nv.get("voice_id"), VoiceConfig(**nv)
+            return nv.voice_id, nv
+        return ELEVENLABS_VOICE_ID, None
+
+    record = await get_character(speaker)
+    if record and record.get("voice"):
+        v = record["voice"]
+        if isinstance(v, dict):
+            return v.get("voice_id"), VoiceConfig(**v)
+        return v.voice_id, v
+    return ELEVENLABS_VOICE_ID, None
+
+
 async def _ensure_comfy_input_image(image: str) -> str:
     source = (_OUTPUT_DIR / image.lstrip("/")).resolve()
     if not str(source).startswith(str(_OUTPUT_DIR.resolve())) or not source.is_file():
@@ -539,7 +679,7 @@ async def agent_chat(payload: dict[str, Any]) -> dict[str, Any]:
                     break
             return {
                 "ok": True,
-                "text": f"Ready to generate image with prompt: \'{prompt_text}\'. Use the sidebar Generate panel or POST /api/image/generate with this prompt and a character.",
+                "text": f"Ready to generate image with prompt: '{prompt_text}'. Use the sidebar Generate panel or POST /api/image/generate with this prompt and a character.",
                 "tool": "image_intent",
                 "suggested_payload": {"prompt": prompt_text, "character": "maya_prototype"},
             }
@@ -549,7 +689,7 @@ async def agent_chat(payload: dict[str, Any]) -> dict[str, Any]:
             prompt_text = last_text
             return {
                 "ok": True,
-                "text": "Ready to generate video. Use POST /api/video/generate with mode \'t2v\' or \'i2v\' and your prompt.",
+                "text": "Ready to generate video. Use POST /api/video/generate with mode 't2v' or 'i2v' and your prompt.",
                 "tool": "video_intent",
                 "suggested_payload": {"mode": "t2v", "prompt": prompt_text},
             }
@@ -569,8 +709,8 @@ async def agent_chat(payload: dict[str, Any]) -> dict[str, Any]:
     text = (
         "I'm the ChitraMaya agent. I can help with: image generation, video generation, "
         "project creation, character management, LoRA training status, and gallery browsing. "
-        "Try asking something like \'generate an image of me at the beach\' or \'show me my characters\'. "
-        f"Your message: \'{last_text or '(empty)'}\'"
+        "Try asking something like 'generate an image of me at the beach' or 'show me my characters'. "
+        f"Your message: '{last_text or '(empty)'}'"
     )
     return {"ok": True, "text": text}
 
@@ -792,19 +932,18 @@ async def generate_project_shot_image(project_id: str, scene_id: str, shot_id: s
         raise HTTPException(status_code=404, detail="Shot not found")
     if shot.get("status") in {"rendering_image", "animating"}:
         raise HTTPException(status_code=409, detail="Shot is already rendering")
-    prompt = shot.get("description") or shot.get("image_prompt") or shot.get("text")
+
+    prompt = shot.get("image_prompt") or shot.get("text")
     if not prompt:
-        raise HTTPException(status_code=400, detail="Shot description, image_prompt, or text is required")
+        raise HTTPException(status_code=400, detail="Shot image_prompt or text is required")
 
     character_ids = await _project_character_ids(project_id, scene_id, shot)
     resolved = await _resolve_characters(None, _character_bindings_from_ids(character_ids))
     bindings = [binding for binding, _ in resolved]
     records = [record for _, record in resolved]
     resolved_prompt = _prompt_with_character_triggers(prompt, records)
-    loras = _character_loras(records, "flux2_lora", bindings)
-    if not loras:
-        raise HTTPException(status_code=400, detail="No character LoRA resolved for image rendering")
 
+    loras = _character_loras(records, "flux2_lora", bindings)
     version_number = await next_shot_version_number(shot_id, "image")
     version_id = _new_id("ver")
     graph = build_flux2_lora_image(
@@ -813,8 +952,7 @@ async def generate_project_shot_image(project_id: str, scene_id: str, shot_id: s
         filename_prefix=f"projects/{project_id}/scene-{shot.get('shot_number', 1):02d}-{shot_id}-image-v{version_number:02d}",
     )
     try:
-        image_client, image_node = comfy_for_role("image")
-        result = await image_client.queue_prompt(graph, client_id=image_node.comfy_client_id)
+        result = await comfy().queue_prompt(graph)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"ComfyUI prompt submission failed: {exc}") from exc
 
@@ -845,7 +983,7 @@ async def generate_project_shot_image(project_id: str, scene_id: str, shot_id: s
             metadata={"project_id": project_id, "scene_id": scene_id, "shot_id": shot_id, "version_id": version_id, "output_role": "image", "character_ids": character_ids, "resolved_loras": loras},
         )
 
-    return ImageGenerateResponse(ok="prompt_id" in result, workflow="flux2_lora", lora_name=loras[0].get("name"), prompt_id=prompt_id, number=result.get("number"), node_errors=result.get("node_errors"))
+    return ImageGenerateResponse(ok="prompt_id" in result, workflow="flux2_lora", lora_name=loras[0].get("name") if loras else None, prompt_id=prompt_id, number=result.get("number"), node_errors=result.get("node_errors"))
 
 
 @app.post("/api/projects/{project_id}/scenes/{scene_id}/shots/{shot_id}/animate", response_model=VideoGenerateResponse)
@@ -950,81 +1088,155 @@ async def _set_render_status(project_id: str, status: str, error: str | None = N
 
 
 async def _run_render(project_id: str, shots: list[dict[str, Any]], render_id: str) -> None:
+    """Upgraded render pipeline with audio mixing, subtitle burning, and job broadcasting."""
     out_path = (_OUTPUT_DIR / f"projects/{project_id}/render-{render_id}.mp4").resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    clip_pairs: list[tuple[Path, dict[str, Any]]] = []
-    for shot in shots:
-        p = (_OUTPUT_DIR / shot["video_file"]).resolve()
-        if not p.is_file():
-            await _set_render_status(project_id, "failed", f"Missing clip for shot {shot['id']}: {shot['video_file']}")
-            return
-        clip_pairs.append((p, shot))
+    await broadcast_event("job_update", {"job_id": render_id, "project_id": project_id, "status": "rendering", "progress": 5})
 
-    concat_tmp = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, prefix="cm_concat_")
-    try:
-        for p, _ in clip_pairs:
-            concat_tmp.write(f"file '{p}'\n")
-        concat_tmp.flush()
-        concat_path = concat_tmp.name
-    finally:
-        concat_tmp.close()
-
-    srt_path: str | None = None
-    srt_entries: list[str] = []
-    cumulative = 0.0
-    for idx, (_, shot) in enumerate(clip_pairs, start=1):
-        duration = float(shot.get("duration_seconds") or 5)
-        subtitle = (shot.get("subtitle") or "").strip()
-        if subtitle:
-            srt_entries.append(
-                f"{idx}\n{_srt_timestamp(cumulative)} --> {_srt_timestamp(cumulative + duration)}\n{subtitle}\n"
-            )
-        cumulative += duration
-
-    if srt_entries:
-        srt_tmp = tempfile.NamedTemporaryFile("w", suffix=".srt", delete=False, prefix="cm_srt_")
-        try:
-            srt_tmp.write("\n".join(srt_entries))
-            srt_tmp.flush()
-            srt_path = srt_tmp.name
-        finally:
-            srt_tmp.close()
-
-    cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_path]
-    if srt_path:
-        style = "FontSize=22,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Alignment=2"
-        cmd += ["-vf", f"subtitles={srt_path}:force_style='{style}'", "-c:v", "libx264", "-preset", "fast", "-crf", "23"]
-    else:
-        cmd += ["-c:v", "copy"]
-    cmd += ["-an", str(out_path)]
-
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    _, stderr = await proc.communicate()
-
-    Path(concat_path).unlink(missing_ok=True)
-    if srt_path:
-        Path(srt_path).unlink(missing_ok=True)
-
-    if proc.returncode != 0:
-        err = stderr.decode(errors="replace")[-800:]
-        await _set_render_status(project_id, "failed", err)
+    project = await get_project(project_id)
+    if not project:
+        await _set_render_status(project_id, "failed", "Project not found")
         return
 
-    stat = out_path.stat()
-    rel = str(out_path.relative_to(_OUTPUT_DIR))
-    await upsert_media({
-        "filename": rel,
-        "type": "video",
-        "size": stat.st_size,
-        "workflow_type": "project_render",
-        "prompt": project_id,
-    })
-    await _set_render_status(project_id, "completed", final_video=rel)
+    processed_clips: list[Path] = []
+    srt_entries: list[str] = []
+    cumulative_time = 0.0
+
+    try:
+        for idx, shot in enumerate(shots, start=1):
+            shot_id = shot["id"]
+            progress = 5 + int((idx / len(shots)) * 80)
+            await broadcast_event("job_update", {"job_id": render_id, "project_id": project_id, "status": "rendering", "message": f"Processing shot {idx}/{len(shots)}", "progress": progress})
+
+            # 1. Resolve Clip Source (Video or frozen Image)
+            video_file = shot.get("video_file")
+            clip_path: Path | None = None
+            if video_file:
+                clip_path = (_OUTPUT_DIR / video_file).resolve()
+            
+            if not clip_path or not clip_path.is_file():
+                # Fallback to image freezing if video is missing but image exists
+                image_file = shot.get("image_file")
+                if image_file:
+                    img_path = (_OUTPUT_DIR / image_file).resolve()
+                    if img_path.is_file():
+                        frozen_video = img_path.with_suffix(".frozen.mp4")
+                        duration = float(shot.get("duration_seconds") or 5)
+                        # Freeze image to video
+                        freeze_cmd = [
+                            "ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
+                            "-c:v", "libx264", "-t", str(duration), "-pix_fmt", "yuv420p",
+                            "-vf", f"scale=trunc(iw/2)*2:trunc(ih/2)*2", str(frozen_video)
+                        ]
+                        proc = await asyncio.create_subprocess_exec(*freeze_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                        await proc.communicate()
+                        clip_path = frozen_video
+                
+            if not clip_path or not clip_path.is_file():
+                await _set_render_status(project_id, "failed", f"Missing media for shot {shot_id}")
+                return
+
+            # 2. TTS Generation
+            audio_path: Path | None = None
+            voiceover_text = shot.get("voiceover") or shot.get("subtitle")
+            if voiceover_text and voiceover_text.strip():
+                audio_path = out_path.parent / f"shot-{shot_id}-audio.mp3"
+                voice_id, voice_settings = await _resolve_voice(shot.get("speaker"), project)
+                ok, speech_end = await _generate_tts(voiceover_text, audio_path, voice_id=voice_id, voice_settings=voice_settings)
+                if not ok:
+                    audio_path = None
+                elif speech_end:
+                    # Optional: adjust shot duration to fit speech if it's longer? 
+                    # For now we stick to shot duration or speech duration, whichever is longer if needed.
+                    pass
+
+            # 3. Mix Shot (Video + Audio)
+            mixed_clip = out_path.parent / f"shot-{shot_id}-mixed.mp4"
+            duration = float(shot.get("duration_seconds") or 5)
+            mix_cmd = ["ffmpeg", "-y", "-i", str(clip_path)]
+            if audio_path:
+                mix_cmd += ["-i", str(audio_path), "-filter_complex", "[0:v]setpts=PTS-STARTPTS[v];[1:a]asetpts=PTS-STARTPTS[a]", "-map", "[v]", "-map", "[a]"]
+            else:
+                mix_cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-map", "0:v", "-map", "1:a"]
+            
+            mix_cmd += ["-t", str(duration), "-c:v", "libx264", "-pix_fmt", "yuv420p", str(mixed_clip)]
+            
+            proc = await asyncio.create_subprocess_exec(*mix_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            await proc.communicate()
+            
+            if mixed_clip.is_file():
+                processed_clips.append(mixed_clip)
+                # Subtitle entry
+                subtitle = (shot.get("subtitle") or "").strip()
+                if subtitle:
+                    srt_entries.append(
+                        f"{len(processed_clips)}\n{_srt_timestamp(cumulative_time)} --> {_srt_timestamp(cumulative_time + duration)}\n{subtitle}\n"
+                    )
+                cumulative_time += duration
+
+        if not processed_clips:
+            await _set_render_status(project_id, "failed", "No clips processed")
+            return
+
+        # 4. Final Concat & Subtitle Burn
+        concat_tmp = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, prefix="cm_concat_")
+        for p in processed_clips:
+            concat_tmp.write(f"file '{p.resolve()}'\n")
+        concat_tmp.close()
+
+        srt_path: str | None = None
+        if srt_entries:
+            srt_tmp = tempfile.NamedTemporaryFile("w", suffix=".srt", delete=False, prefix="cm_srt_", encoding="utf-8")
+            srt_tmp.write("\n".join(srt_entries))
+            srt_tmp.close()
+            srt_path = srt_tmp.name
+
+        cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_tmp.name]
+        if srt_path:
+            style = "FontSize=22,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Alignment=2"
+            # On Windows, we might need to escape the path or use short paths for the subtitles filter
+            # But for now we try standard path. 
+            # Note: ffmpeg subtitles filter often dislikes backslashes in Windows paths.
+            normalized_srt = srt_path.replace("\\", "/")
+            if ":" in normalized_srt:
+                normalized_srt = normalized_srt.replace(":", "\\:")
+            cmd += ["-vf", f"subtitles={normalized_srt}:force_style='{style}'"]
+        
+        cmd += ["-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-b:a", "192k", str(out_path)]
+
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        _, stderr = await proc.communicate()
+
+        Path(concat_tmp.name).unlink(missing_ok=True)
+        if srt_path:
+            Path(srt_path).unlink(missing_ok=True)
+
+        if proc.returncode != 0:
+            err = stderr.decode(errors="replace")[-800:]
+            await _set_render_status(project_id, "failed", err)
+            return
+
+        # Cleanup intermediate clips
+        for p in processed_clips:
+            if "shot-" in p.name and "-mixed.mp4" in p.name:
+                p.unlink(missing_ok=True)
+
+        stat = out_path.stat()
+        rel = str(out_path.relative_to(_OUTPUT_DIR))
+        await upsert_media({
+            "filename": rel,
+            "type": "video",
+            "size": stat.st_size,
+            "workflow_type": "project_render",
+            "prompt": project_id,
+        })
+        await _set_render_status(project_id, "completed", final_video=rel)
+        await broadcast_event("job_update", {"job_id": render_id, "project_id": project_id, "status": "completed", "progress": 100, "output": rel})
+
+    except Exception as e:
+        await _set_render_status(project_id, "failed", str(e))
+        await broadcast_event("job_update", {"job_id": render_id, "project_id": project_id, "status": "failed", "error": str(e)})
 
 
 @app.post("/api/projects/{project_id}/render")
@@ -1089,8 +1301,6 @@ async def health() -> dict[str, Any]:
         "comfy_nodes_online": online,
         "comfy_nodes_offline": len(comfy_nodes) - online,
     }
-
-
 
 
 @app.get("/api/nodes")
@@ -1169,6 +1379,10 @@ async def generate_video(body: VideoGenerateRequest) -> VideoGenerateResponse:
     character_records = [record for _, record in resolved]
     prompt = _prompt_with_character_triggers(body.prompt, character_records)
 
+    length = body.length
+    if body.duration_seconds:
+        length = (body.duration_seconds * body.fps) + 1
+
     image = body.image
     if body.mode == "i2v" and not image and resolved:
         image = _character_reference_image(bindings[0], character_records[0])
@@ -1190,7 +1404,7 @@ async def generate_video(body: VideoGenerateRequest) -> VideoGenerateResponse:
             negative=body.negative,
             width=body.width,
             height=body.height,
-            length=body.length,
+            length=length,
             fps=body.fps,
             seed=body.seed,
             filename_prefix=body.filename_prefix,
@@ -1216,7 +1430,7 @@ async def generate_video(body: VideoGenerateRequest) -> VideoGenerateResponse:
             negative=body.negative,
             width=body.width,
             height=body.height,
-            length=body.length,
+            length=length,
             fps=body.fps,
             seed=body.seed,
             filename_prefix=body.filename_prefix,
@@ -1384,12 +1598,7 @@ async def _queue_position(client: ComfyClient, prompt_id: str) -> int | None:
 
 @app.get("/api/jobs")
 async def jobs(include_completed: bool = False) -> dict[str, Any]:
-    """Return jobs submitted through this API from durable Postgres state.
-
-    ComfyUI remains the execution engine. Its live queue is used only to refresh
-    status/queue position for jobs already registered in Postgres; arbitrary
-    Comfy queue entries are not surfaced.
-    """
+    """Return jobs submitted through this API from durable Postgres state."""
     db_jobs = await list_jobs(limit=100)
     client = comfy()
 
@@ -1436,8 +1645,6 @@ async def jobs(include_completed: bool = False) -> dict[str, Any]:
                         job["status"] = "completed"
                         job["output_filename"] = outputs[0].filename
                     else:
-                        # Comfy is the source of truth. If a job is neither in
-                        # /queue nor /history, do not invent a status for it.
                         job["_missing_from_comfy"] = True
 
         job_values.append(job)
@@ -1461,9 +1668,6 @@ async def jobs(include_completed: bool = False) -> dict[str, Any]:
 @app.get("/api/jobs/{prompt_id}", response_model=JobStatusResponse)
 async def job(prompt_id: str) -> JobStatusResponse:
     client = comfy()
-
-    # ComfyUI's normalized jobs endpoint reports pending/in_progress/completed.
-    # It is the right polling surface for UI status. Raw /history only exists after completion.
     try:
         comfy_job = await client.get(f"/api/jobs/{prompt_id}")
         outputs = _extract_outputs_from_comfy_job(comfy_job, client)
@@ -1485,7 +1689,6 @@ async def job(prompt_id: str) -> JobStatusResponse:
             raw=comfy_job,
         )
     except Exception:
-        # Older ComfyUI builds may not have /api/jobs/{id}; fall back to history.
         history = await client.get(f"/history/{prompt_id}")
         outputs = _extract_outputs(history, client)
         status = "completed" if outputs else ("running" if history == {} else "unknown")
@@ -1497,7 +1700,6 @@ async def job(prompt_id: str) -> JobStatusResponse:
 
 
 import os
-from fastapi.responses import FileResponse
 
 _OUTPUT_DIR = Path(get_settings().output_dir)
 _ALLOW_EXT = {".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm", ".gif"}
@@ -1565,508 +1767,14 @@ def _media_item(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _parse_rocm_value(pattern: str, text: str) -> float | None:
-    match = re.search(pattern, text)
-    if not match:
-        return None
-    try:
-        return float(match.group(1))
-    except ValueError:
-        return None
-
-
-def _read_gpu_status() -> tuple[float | None, float | None]:
-    try:
-        result = subprocess.run(
-            ["/opt/rocm/bin/rocm-smi", "--showuse", "--showmemuse"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-    except Exception:
-        return None, None
-
-    output = result.stdout + result.stderr
-    gpu_util = _parse_rocm_value(r"GPU use \(%\):\s*([0-9.]+)", output)
-    vram_percent = _parse_rocm_value(r"GPU Memory Allocated \(VRAM%\):\s*([0-9.]+)", output)
-    return gpu_util, vram_percent
-
-
-def _latest_lora_progress(log_text: str) -> dict[str, Any] | None:
-    # TQDM writes carriage-return progress lines; search the whole tail chunk.
-    pattern = re.compile(
-        r"(?P<step>\d+)/(?:\s*)?(?P<total>\d+)\s*"
-        r"\[(?P<elapsed>[^\]<]+)<(?P<eta>[^,\]]+),\s*"
-        r"(?P<seconds>[0-9.]+)s/it,\s*lr:\s*(?P<lr>[0-9.eE+-]+)\s*loss:\s*(?P<loss>[0-9.eE+-]+)"
-    )
-    matches = list(pattern.finditer(log_text))
-    if not matches:
-        return None
-    match = matches[-1]
-    step = int(match.group("step"))
-    total = int(match.group("total"))
-    return {
-        "current_step": step,
-        "total_steps": total,
-        "progress_percent": round((step / total) * 100, 2) if total else None,
-        "loss": float(match.group("loss")),
-        "lr": float(match.group("lr")),
-        "elapsed": match.group("elapsed"),
-        "eta": match.group("eta"),
-        "seconds_per_step": float(match.group("seconds")),
-    }
-
-
-@app.get("/api/lora-training/status", response_model=LoraTrainingStatus)
-async def lora_training_status() -> LoraTrainingStatus:
-    gpu_util, vram_percent = _read_gpu_status()
-    updated_at = datetime.now(UTC).isoformat()
-
-    if not _LORA_TRAINING_LOG.exists():
-        return LoraTrainingStatus(
-            ok=False,
-            status="missing_log",
-            job_name=_LORA_JOB_NAME,
-            gpu_util=gpu_util,
-            vram_percent=vram_percent,
-            log_path=str(_LORA_TRAINING_LOG),
-            updated_at=updated_at,
-            error="Training log not found",
-        )
-
-    try:
-        log_text = _LORA_TRAINING_LOG.read_text(errors="replace")[-200_000:]
-    except Exception as exc:
-        return LoraTrainingStatus(
-            ok=False,
-            status="error",
-            job_name=_LORA_JOB_NAME,
-            gpu_util=gpu_util,
-            vram_percent=vram_percent,
-            log_path=str(_LORA_TRAINING_LOG),
-            updated_at=updated_at,
-            error=str(exc),
-        )
-
-    progress = _latest_lora_progress(log_text)
-    if not progress:
-        status = "starting" if "Running job" in log_text else "unknown"
-        return LoraTrainingStatus(
-            ok=True,
-            status=status,
-            job_name=_LORA_JOB_NAME,
-            gpu_util=gpu_util,
-            vram_percent=vram_percent,
-            log_path=str(_LORA_TRAINING_LOG),
-            updated_at=updated_at,
-        )
-
-    current_step = progress["current_step"]
-    total_steps = progress["total_steps"]
-    final_checkpoint = _LORA_OUTPUT_DIR / f"{_LORA_JOB_NAME}.safetensors"
-
-    completed = current_step >= total_steps
-    completed = completed or final_checkpoint.is_file()
-    completed = completed or "Done training" in log_text or "Training complete" in log_text
-    status = "completed" if completed else "training"
-
-    # ai-toolkit can finish by writing the final unnumbered checkpoint after the last
-    # progress line has already been emitted. In that case tqdm may leave the log at
-    # 1799/1800 even though training is actually complete. The final checkpoint is the
-    # durable source of truth, so normalize the displayed step to 100% when it exists.
-    if completed and final_checkpoint.is_file() and current_step < total_steps:
-        progress = {**progress, "current_step": total_steps, "progress_percent": 100.0, "eta": "00:00"}
-
-    return LoraTrainingStatus(
-        ok=True,
-        status=status,
-        job_name=_LORA_JOB_NAME,
-        gpu_util=gpu_util,
-        vram_percent=vram_percent,
-        log_path=str(_LORA_TRAINING_LOG),
-        updated_at=updated_at,
-        **progress,
-    )
-
-
-def _lora_checkpoint_path(checkpoint: str) -> Path:
-    if checkpoint == "latest":
-        candidates = sorted(
-            _LORA_OUTPUT_DIR.glob("*.safetensors"),
-            key=lambda path: path.stat().st_mtime,
-        ) if _LORA_OUTPUT_DIR.is_dir() else []
-        if not candidates:
-            raise HTTPException(status_code=404, detail="No LoRA checkpoints found")
-        return candidates[-1]
-
-    path = Path(checkpoint)
-    if not path.is_absolute():
-        path = _LORA_OUTPUT_DIR / checkpoint
-    try:
-        resolved = path.resolve()
-        output_root = _LORA_OUTPUT_DIR.resolve()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid checkpoint path: {checkpoint}") from exc
-    if not str(resolved).startswith(str(output_root)):
-        raise HTTPException(status_code=400, detail="Checkpoint must be inside the LoRA output directory")
-    if resolved.suffix != ".safetensors" or not resolved.is_file():
-        raise HTTPException(status_code=404, detail="Checkpoint not found")
-    return resolved
-
-
-def _comfy_lora_name_for_checkpoint(path: Path) -> str:
-    _COMFY_LORA_DIR.mkdir(parents=True, exist_ok=True)
-    link_path = _COMFY_LORA_DIR / path.name
-    if not link_path.exists():
-        link_path.symlink_to(path)
-    return f"chitramaya-engine/{path.name}"
-
-
-@app.post("/api/image/generate", response_model=ImageGenerateResponse)
-async def generate_image(body: ImageGenerateRequest) -> ImageGenerateResponse:
-    if body.workflow != "flux2_lora":
-        raise HTTPException(status_code=400, detail=f"Unsupported image workflow: {body.workflow}")
-
-    resolved = await _resolve_characters(body.character, body.characters)
-    bindings = [binding for binding, _ in resolved]
-    character_records = [record for _, record in resolved]
-    prompt = _prompt_with_character_triggers(body.prompt, character_records)
-    loras = _character_loras(character_records, body.workflow, bindings)
-
-    checkpoint_name: str | None = None
-    checkpoint_lora_name: str | None = None
-    if body.checkpoint:
-        checkpoint_path = _lora_checkpoint_path(body.checkpoint)
-        checkpoint_name = checkpoint_path.name
-        checkpoint_lora_name = _comfy_lora_name_for_checkpoint(checkpoint_path)
-        loras.insert(0, {"name": checkpoint_lora_name, "strength": body.lora_strength, "checkpoint": checkpoint_name})
-
-    graph = build_flux2_lora_image(
-        prompt=prompt,
-        loras=loras,
-        width=body.width,
-        height=body.height,
-        seed=body.seed,
-        filename_prefix=body.filename_prefix,
-        steps=body.steps,
-        cfg=body.cfg,
-        sampler=body.sampler,
-        guidance=body.guidance,
-        unet=body.unet,
-        clip=body.clip,
-        vae=body.vae,
-        lora_strength=body.lora_strength,
-    )
-
-    resolved_lora_name = checkpoint_lora_name or (loras[0].get("name") if loras else None)
-
-    if not body.submit:
-        return ImageGenerateResponse(ok=True, workflow=body.workflow, checkpoint=checkpoint_name, lora_name=resolved_lora_name, graph=graph)
-
-    try:
-        image_client, image_node = comfy_for_role("image")
-        result = await image_client.queue_prompt(graph, client_id=image_node.comfy_client_id)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"ComfyUI prompt submission failed: {exc}") from exc
-
-    prompt_id = result.get("prompt_id")
-    if prompt_id:
-        await save_job(
-            prompt_id=prompt_id,
-            job_type="flux2_lora_image",
-            status="pending",
-            prompt=prompt,
-            width=body.width,
-            height=body.height,
-            workflow_json=graph,
-            metadata={**body.model_dump(), "checkpoint": checkpoint_name, "lora_name": checkpoint_lora_name, "resolved_prompt": prompt, "character_ids": [record.get("id") for record in character_records], "resolved_loras": loras},
-        )
-
-    return ImageGenerateResponse(
-        ok="prompt_id" in result,
-        workflow=body.workflow,
-        checkpoint=checkpoint_name,
-        lora_name=resolved_lora_name,
-        prompt_id=prompt_id,
-        number=result.get("number"),
-        node_errors=result.get("node_errors"),
-    )
-
-
-@app.get("/api/lora-training/checkpoints", response_model=LoraCheckpointsResponse)
-async def lora_training_checkpoints() -> LoraCheckpointsResponse:
-    updated_at = datetime.now(UTC).isoformat()
-    checkpoints: list[LoraCheckpoint] = []
-
-    if _LORA_OUTPUT_DIR.is_dir():
-        for path in sorted(_LORA_OUTPUT_DIR.glob("*.safetensors")):
-            stat = path.stat()
-            step_match = re.search(r"_(\d{6,})\.safetensors$", path.name)
-            checkpoints.append(
-                LoraCheckpoint(
-                    name=path.name,
-                    step=int(step_match.group(1)) if step_match else None,
-                    path=str(path),
-                    size_bytes=stat.st_size,
-                    modified_at=datetime.fromtimestamp(stat.st_mtime, UTC).isoformat(),
-                )
-            )
-
-    checkpoints.sort(key=lambda item: item.step if item.step is not None else -1)
-    return LoraCheckpointsResponse(
-        ok=True,
-        job_name=_LORA_JOB_NAME,
-        checkpoints=checkpoints,
-        count=len(checkpoints),
-        updated_at=updated_at,
-    )
-
-
-# ── LoRA Training Start ──────────────────────────────────────────────────────
-
-_TRAINING_DIR = Path(os.environ.get("CHITRAMAYA_TRAINING_DIR", "/root/chitramaya-training"))
-_AI_TOOLKIT_RUNNER = Path(os.environ.get("CHITRAMAYA_AI_TOOLKIT_RUNNER", "/root/chitramaya-training/run-ai-toolkit.sh"))
-_TRAINING_PROCESS: asyncio.subprocess.Process | None = None
-
-
-class LoraTrainingStartRequest(BaseModel):
-    config_path: str | None = Field(default=None, description="Absolute path to an AI Toolkit YAML config")
-    job_name: str | None = Field(default=None, description="Name for the training job; used to build config path")
-    trigger_word: str | None = Field(default=None, description="Character trigger word to inject into template")
-    dataset_path: str | None = Field(default=None, description="Path to the dataset folder")
-    base_model: Literal["flux2", "wan22_i2v"] = Field(default="flux2", description="Which template to use")
-    steps: int | None = Field(default=None, description="Override training steps")
-    rank: int | None = Field(default=None, description="Override LoRA rank")
-    learning_rate: float | None = Field(default=None, description="Override learning rate")
-
-
-class LoraTrainingStartResponse(BaseModel):
-    ok: bool
-    status: str
-    job_name: str
-    config_path: str
-    log_path: str
-    error: str | None = None
-
-
-def _build_training_config(req: LoraTrainingStartRequest) -> tuple[str, Path]:
-    """Build or resolve a training config YAML. Returns (job_name, config_path)."""
-    import yaml  # type: ignore[import-untyped]  # noqa: F811
-
-    if req.config_path:
-        path = Path(req.config_path)
-        if not path.is_file():
-            raise HTTPException(status_code=404, detail=f"Config not found: {req.config_path}")
-        stem = path.stem
-        return stem, path
-
-    job_name = req.job_name or f"chitramaya_{req.base_model}_{uuid.uuid4().hex[:6]}"
-    template_name = "flux2_identity_template.yaml" if req.base_model == "flux2" else "wan22_i2v_character_template.yaml"
-    template_path = Path(__file__).resolve().parents[2] / "training" / template_name
-
-    if not template_path.is_file():
-        raise HTTPException(status_code=500, detail=f"Training template not found: {template_path}")
-
-    with template_path.open() as fh:
-        config = yaml.safe_load(fh)
-
-    process_block = config.get("config", {}).get("process", [{}])[0]
-    process_block["trigger_word"] = req.trigger_word or "character_trigger"
-    if req.dataset_path:
-        datasets = process_block.get("datasets", [{}])
-        if datasets:
-            datasets[0]["folder_path"] = req.dataset_path
-    if req.steps:
-        process_block.get("train", {})["steps"] = req.steps
-    if req.rank:
-        network = process_block.get("network", {})
-        network["linear"] = req.rank
-        network["linear_alpha"] = req.rank
-    if req.learning_rate:
-        process_block.get("train", {})["lr"] = req.learning_rate
-
-    config["config"]["name"] = job_name
-    config["config"]["process"][0] = process_block
-
-    config_dir = _TRAINING_DIR / "config"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    config_path = config_dir / f"{job_name}.yaml"
-    with config_path.open("w") as fh:
-        yaml.dump(config, fh, default_flow_style=False, sort_keys=False)
-
-    return job_name, config_path
-
-
-@app.post("/api/lora-training/start", response_model=LoraTrainingStartResponse)
-async def lora_training_start(body: LoraTrainingStartRequest) -> LoraTrainingStartResponse:
-    """Launch a LoRA training job on the GPU worker using AI Toolkit."""
-    global _TRAINING_PROCESS
-
-    # Refuse if training is already running
-    if _TRAINING_PROCESS is not None and _TRAINING_PROCESS.returncode is None:
-        return LoraTrainingStartResponse(
-            ok=False,
-            status="already_running",
-            job_name=_LORA_JOB_NAME,
-            config_path="",
-            log_path=str(_LORA_TRAINING_LOG),
-            error="A training job is already running. Wait for it to finish or stop it first.",
-        )
-
-    try:
-        job_name, config_path = _build_training_config(body)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to build training config: {exc}") from exc
-
-    log_path = _TRAINING_DIR / f"{job_name}.log"
-    runner = str(_AI_TOOLKIT_RUNNER)
-
-    if not Path(runner).is_file():
-        return LoraTrainingStartResponse(
-            ok=False,
-            status="missing_runner",
-            job_name=job_name,
-            config_path=str(config_path),
-            log_path=str(log_path),
-            error=f"AI Toolkit runner script not found: {runner}. Run infra/setup-training-env.sh first.",
-        )
-
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_fh = log_path.open("w")
-
-    try:
-        _TRAINING_PROCESS = await asyncio.create_subprocess_exec(
-            runner,
-            str(config_path),
-            stdout=log_fh,
-            stderr=asyncio.subprocess.STDOUT,
-            cwd=str(_TRAINING_DIR),
-        )
-    except Exception as exc:  # noqa: BLE001
-        log_fh.close()
-        return LoraTrainingStartResponse(
-            ok=False,
-            status="launch_failed",
-            job_name=job_name,
-            config_path=str(config_path),
-            log_path=str(log_path),
-            error=str(exc),
-        )
-
-    return LoraTrainingStartResponse(
-        ok=True,
-        status="started",
-        job_name=job_name,
-        config_path=str(config_path),
-        log_path=str(log_path),
-    )
-
-
-@app.post("/api/lora-training/stop")
-async def lora_training_stop() -> dict[str, Any]:
-    """Stop a running LoRA training job."""
-    global _TRAINING_PROCESS
-    if _TRAINING_PROCESS is None or _TRAINING_PROCESS.returncode is not None:
-        return {"ok": False, "error": "No training job is currently running."}
-    _TRAINING_PROCESS.terminate()
-    try:
-        await asyncio.wait_for(_TRAINING_PROCESS.wait(), timeout=15)
-    except asyncio.TimeoutError:
-        _TRAINING_PROCESS.kill()
-    _TRAINING_PROCESS = None
-    return {"ok": True, "status": "stopped"}
-
-
-# ── Dataset Upload ───────────────────────────────────────────────────────────
-
-@app.post("/api/datasets/upload")
-async def upload_dataset(
-    name: str = "uploaded",
-    file: UploadFile = File(...),
-) -> dict[str, Any]:
-    """Upload a zip archive of images + caption .txt files for LoRA training."""
-    import zipfile
-
-    dataset_dir = _TRAINING_DIR / "datasets" / name
-    dataset_dir.mkdir(parents=True, exist_ok=True)
-
-    suffix = Path(file.filename or "dataset.zip").suffix or ".zip"
-    if suffix.lower() != ".zip":
-        raise HTTPException(status_code=400, detail="Only .zip archives are supported")
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
-        tmp_path = Path(tmp.name)
-        tmp.write(await file.read())
-
-    extracted: list[str] = []
-    try:
-        with zipfile.ZipFile(tmp_path, "r") as zf:
-            for member in zf.namelist():
-                basename = Path(member).name
-                if not basename or member.endswith("/"):
-                    continue
-                ext = Path(basename).suffix.lower()
-                if ext not in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".txt"}:
-                    continue
-                target = dataset_dir / basename
-                with zf.open(member) as src, target.open("wb") as dst:
-                    dst.write(src.read())
-                extracted.append(basename)
-    except zipfile.BadZipFile as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid zip file: {exc}") from exc
-    finally:
-        tmp_path.unlink(missing_ok=True)
-
-    images = [f for f in extracted if not f.endswith(".txt")]
-    captions = [f for f in extracted if f.endswith(".txt")]
-    return {
-        "ok": True,
-        "dataset_name": name,
-        "dataset_path": str(dataset_dir),
-        "files_extracted": len(extracted),
-        "images": len(images),
-        "captions": len(captions),
-    }
-
-
-@app.get("/api/datasets")
-async def list_datasets() -> dict[str, Any]:
-    """List available training datasets."""
-    datasets_dir = _TRAINING_DIR / "datasets"
-    result: list[dict[str, Any]] = []
-    if datasets_dir.is_dir():
-        for entry in sorted(datasets_dir.iterdir()):
-            if not entry.is_dir():
-                continue
-            files = list(entry.iterdir())
-            images = [f.name for f in files if f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".bmp"}]
-            captions = [f.name for f in files if f.suffix.lower() == ".txt"]
-            result.append({
-                "name": entry.name,
-                "path": str(entry),
-                "images": len(images),
-                "captions": len(captions),
-                "total_files": len(files),
-            })
-    return {"datasets": result, "count": len(result)}
-
-
 @app.get("/api/listing")
 async def listing(dir: str = "", offset: int = 0, limit: int = 60) -> dict[str, Any]:
-    # Backfill the database from ComfyUI's output folder before reading. This keeps
-    # old files visible while new generations become durable DB records.
     await _sync_filesystem_media(limit=500)
     rows = await list_media(limit=limit, offset=offset)
     if dir:
         prefix = dir.strip("/") + "/"
         rows = [row for row in rows if str(row.get("filename", "")).startswith(prefix)]
 
-    # The database is metadata, not durable media storage. If a disposable GPU
-    # worker was destroyed before outputs were copied back, stale rows can point
-    # at files that no longer exist on the VPS. Do not return broken media tiles.
     available_rows = [
         row for row in rows
         if (target := _safe_output_path(str(row.get("filename", "")))) is not None and target.is_file()
@@ -2115,4 +1823,3 @@ async def delete_media(body: dict[str, Any]) -> dict[str, Any]:
     if deleted:
         await delete_media_rows(deleted)
     return {"ok": not failed, "deleted": deleted, "failed": failed}
-

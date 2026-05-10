@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     request_timeout_seconds: float = Field(default=120.0, validation_alias="REQUEST_TIMEOUT_SECONDS")
     database_url: str = Field(default="postgresql:///chitramaya", validation_alias="DATABASE_URL")
     output_dir: str = Field(default="/root/ComfyUI/output", validation_alias="CHITRAMAYA_OUTPUT_DIR")
+    elevenlabs_api_key: str | None = Field(default=None, validation_alias="ELEVENLABS_API_KEY")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
