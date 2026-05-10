@@ -101,10 +101,12 @@ class ShotRecord(BaseModel):
     project_id: str | None = None
     scene_id: str | None = None
     shot_number: int = Field(ge=1)
+    title: str | None = None
     text: str | None = None
     description: str | None = None
     subtitle: str | None = None
     voiceover: str | None = None
+    speaker: str | None = None
     image_prompt: str | None = None
     motion_prompt: str | None = None
     camera_motion: str | None = None
@@ -128,6 +130,7 @@ class VideoGenerateRequest(BaseModel):
     width: int = 1280
     height: int = 720
     length: int = Field(default=81, description="Frame count, not seconds (81 = ~5s)")
+    duration_seconds: int | None = Field(default=None, description="If provided, overrides length (16fps)")
     fps: int = 16
     seed: int | None = None
     filename_prefix: str = "videos"
@@ -750,7 +753,7 @@ async def patch_project_shot(project_id: str, scene_id: str, shot_id: str, patch
     current = await get_project_shot(project_id, scene_id, shot_id)
     if not current:
         raise HTTPException(status_code=404, detail="Shot not found")
-    allowed = {"shot_number", "text", "description", "subtitle", "voiceover", "image_prompt", "motion_prompt", "camera_motion", "characters", "duration_seconds", "status", "image_file", "video_file", "image_prompt_id", "video_prompt_id", "metadata"}
+    allowed = {"shot_number", "title", "text", "description", "subtitle", "voiceover", "speaker", "image_prompt", "motion_prompt", "camera_motion", "characters", "duration_seconds", "status", "image_file", "video_file", "image_prompt_id", "video_prompt_id", "metadata"}
     unknown = sorted(set(patch) - allowed)
     if unknown:
         raise HTTPException(status_code=400, detail=f"Unsupported shot fields: {', '.join(unknown)}")
@@ -1181,6 +1184,10 @@ async def generate_video(body: VideoGenerateRequest) -> VideoGenerateResponse:
     high_lora_strength = body.high_lora_strength if body.high_lora else (wan_loras[0]["strength"] if wan_loras else body.high_lora_strength)
     low_lora_strength = body.low_lora_strength if body.low_lora else (wan_loras[0]["strength"] if wan_loras else body.low_lora_strength)
 
+    length = body.length
+    if body.duration_seconds is not None:
+        length = max(1, int(body.duration_seconds * body.fps))
+
     if body.mode == "i2v":
         if not image:
             raise HTTPException(status_code=400, detail="image is required for i2v mode. Upload first with /api/images/upload or supply a character with a reference image.")
@@ -1190,7 +1197,7 @@ async def generate_video(body: VideoGenerateRequest) -> VideoGenerateResponse:
             negative=body.negative,
             width=body.width,
             height=body.height,
-            length=body.length,
+            length=length,
             fps=body.fps,
             seed=body.seed,
             filename_prefix=body.filename_prefix,
@@ -1216,7 +1223,7 @@ async def generate_video(body: VideoGenerateRequest) -> VideoGenerateResponse:
             negative=body.negative,
             width=body.width,
             height=body.height,
-            length=body.length,
+            length=length,
             fps=body.fps,
             seed=body.seed,
             filename_prefix=body.filename_prefix,

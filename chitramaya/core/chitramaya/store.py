@@ -418,16 +418,18 @@ async def upsert_project_shot(shot: dict[str, Any]) -> dict[str, Any]:
         row = await conn.fetchrow(
             """
             INSERT INTO project_shots (
-                id, project_id, scene_id, shot_number, text, description, subtitle, voiceover, image_prompt, motion_prompt,
+                id, project_id, scene_id, shot_number, title, text, description, subtitle, voiceover, speaker, image_prompt, motion_prompt,
                 camera_motion, characters, duration_seconds, status, image_file, video_file,
                 image_prompt_id, video_prompt_id, metadata, updated_at
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,$15,$16,$17,$18,$19::jsonb,NOW())
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16,$17,$18,$19,$20,$21::jsonb,NOW())
             ON CONFLICT (id) DO UPDATE SET
                 shot_number=EXCLUDED.shot_number,
+                title=EXCLUDED.title,
                 text=EXCLUDED.text,
                 description=EXCLUDED.description,
                 subtitle=EXCLUDED.subtitle,
                 voiceover=EXCLUDED.voiceover,
+                speaker=EXCLUDED.speaker,
                 image_prompt=EXCLUDED.image_prompt,
                 motion_prompt=EXCLUDED.motion_prompt,
                 camera_motion=EXCLUDED.camera_motion,
@@ -446,10 +448,12 @@ async def upsert_project_shot(shot: dict[str, Any]) -> dict[str, Any]:
             shot["project_id"],
             shot["scene_id"],
             shot["shot_number"],
+            shot.get("title"),
             shot.get("text"),
             shot.get("description"),
             shot.get("subtitle"),
             shot.get("voiceover"),
+            shot.get("speaker"),
             shot.get("image_prompt"),
             shot.get("motion_prompt"),
             shot.get("camera_motion"),
