@@ -805,8 +805,6 @@ async def generate_project_shot_image(project_id: str, scene_id: str, shot_id: s
     records = [record for _, record in resolved]
     resolved_prompt = _prompt_with_character_triggers(prompt, records)
     loras = _character_loras(records, "flux2_lora", bindings)
-    if not loras:
-        raise HTTPException(status_code=400, detail="No character LoRA resolved for image rendering")
 
     version_number = await next_shot_version_number(shot_id, "image")
     version_id = _new_id("ver")
