@@ -45,7 +45,7 @@ cd /root/chitramaya/hosting
 mkdir -p public
 cp -r ../dashboard/dist/* public/
 # Set proxy target to the droplet
-sed -i "s|http://165.245.130.122:8190|http://134.199.192.206:8190|g" proxy.js
+sed -i "s|http://165.245.130.122:8190|http://14.139.241.214:8190|g" proxy.js
 
 rm -rf .git
 git init
