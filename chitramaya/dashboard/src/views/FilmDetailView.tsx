@@ -663,7 +663,7 @@ function ShotEditor({ shot, phase, saving, onPatch, onGenerate, onAnimate }: Sho
 
   return (
     <div className="space-y-4">
-      <Field label="Subtitle" hint="Viewer-facing narration. Burned onto the final video.">
+      <Field label="Narration & Subtitle" hint="Viewer-facing narration. Generates high-quality AI voice-over and burns text into the final video.">
         <textarea
           value={draft.subtitle}
           onChange={(e) => setDraft((d) => ({ ...d, subtitle: e.target.value }))}

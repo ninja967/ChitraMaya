@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, Film, GitBranch, RefreshCw, UserCircle } from "lucide-react";
+import { CheckCircle2, Clock, Film, GitBranch, Plus, RefreshCw, Trash2, UserCircle } from "lucide-react";
 
 interface Project {
   id: string;
@@ -62,11 +62,44 @@ export function FilmsView({ compact = false, onOpenProject }: FilmsViewProps) {
     try {
       const response = await fetch("/api/projects");
       if (!response.ok) throw new Error(`/api/projects returned ${response.status}`);
-      const data = await response.json() as ProjectsResponse;
+      const data = (await response.json()) as ProjectsResponse;
       setProjects(data.projects || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load projects");
     } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createProject() {
+    const title = window.prompt("Enter project title:", "New Creative Project");
+    if (!title) return;
+    setLoading(true);
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, aspect_ratio: "9:16", status: "draft" }),
+      });
+      if (!response.ok) throw new Error(`Create failed: ${response.status}`);
+      const created = await response.json();
+      await load();
+      onOpenProject?.(created.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create project");
+      setLoading(false);
+    }
+  }
+
+  async function deleteProject(id: string) {
+    if (!window.confirm("Are you sure you want to delete this project and all its content?")) return;
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(`Delete failed: ${response.status}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete project");
       setLoading(false);
     }
   }
@@ -87,13 +120,24 @@ export function FilmsView({ compact = false, onOpenProject }: FilmsViewProps) {
             <h2 className="text-sm font-display font-bold tracking-tight text-gray-100">Projects</h2>
             <p className="text-xs text-gray-500 leading-relaxed">Multi-shot media projects with reviewable scenes and shots.</p>
           </div>
-          <button
-            onClick={() => { setLoading(true); load(); }}
-            className="ml-auto w-9 h-9 rounded-lg border border-white/[0.06] bg-white/[0.02] text-gray-500 hover:text-emerald-300 hover:border-emerald-500/25 hover:bg-emerald-500/5 transition-all duration-200 flex items-center justify-center"
-            title="Refresh projects"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={createProject}
+              className="inline-flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-600/10 hover:bg-rose-600/20 px-3 py-1.5 text-xs font-medium text-rose-100 transition shadow-lg shadow-rose-500/5"
+            >
+              <Plus className="w-3.5 h-3.5" /> New Project
+            </button>
+            <button
+              onClick={() => {
+                setLoading(true);
+                load();
+              }}
+              className="w-9 h-9 rounded-lg border border-white/[0.06] bg-white/[0.02] text-gray-500 hover:text-emerald-300 hover:border-emerald-500/25 hover:bg-emerald-500/5 transition-all duration-200 flex items-center justify-center"
+              title="Refresh projects"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
       </section>
 
@@ -147,15 +191,27 @@ export function FilmsView({ compact = false, onOpenProject }: FilmsViewProps) {
               onClick={() => onOpenProject?.(project.id)}
               className={`rounded-xl border border-white/[0.06] bg-gradient-to-br from-white/[0.02] to-transparent p-3.5 space-y-2 transition-all duration-200 animate-fade-in stagger-${Math.min(i + 1, 6)} ${onOpenProject ? "cursor-pointer hover:border-emerald-500/20 hover:from-emerald-500/[0.02] hover:shadow-lg hover:shadow-emerald-500/5" : ""}`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="text-xs font-display font-bold text-gray-100 truncate">{project.title}</h3>
-                  {text && <p className="text-[11px] text-gray-500 mt-1 line-clamp-2 leading-relaxed">{text}</p>}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1" onClick={() => onOpenProject?.(project.id)}>
+                    <h3 className="text-xs font-display font-bold text-gray-100 truncate">{project.title}</h3>
+                    {text && <p className="text-[11px] text-gray-500 mt-1 line-clamp-2 leading-relaxed">{text}</p>}
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`flex-shrink-0 text-[9px] uppercase tracking-wider rounded-full border px-2 py-0.5 font-bold ${statusStyle}`}>
+                      {project.status}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteProject(project.id);
+                      }}
+                      className="p-1 rounded-md text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      title="Delete project"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
-                <span className={`flex-shrink-0 text-[9px] uppercase tracking-wider rounded-full border px-2 py-0.5 font-bold ${statusStyle}`}>
-                  {project.status}
-                </span>
-              </div>
               <div className="flex items-center gap-3 pt-2 border-t border-white/[0.04] text-[10px] text-gray-600">
                 <span className="font-mono font-medium">{project.aspect_ratio}</span>
                 {project.duration_seconds !== null && (
