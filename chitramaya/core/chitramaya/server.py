@@ -1628,7 +1628,21 @@ async def lora_training_status() -> LoraTrainingStatus:
     gpu_util, vram_percent = _read_gpu_status()
     updated_at = datetime.now(UTC).isoformat()
 
+    global _TRAINING_PROCESS
+
     if not _LORA_TRAINING_LOG.exists():
+        # Check if the process failed to even create a log
+        if _TRAINING_PROCESS is not None and _TRAINING_PROCESS.returncode is not None and _TRAINING_PROCESS.returncode != 0:
+             return LoraTrainingStatus(
+                ok=False,
+                status="failed",
+                job_name=_LORA_JOB_NAME,
+                gpu_util=gpu_util,
+                vram_percent=vram_percent,
+                updated_at=updated_at,
+                error=f"Training process exited with code {_TRAINING_PROCESS.returncode}",
+            )
+
         return LoraTrainingStatus(
             ok=False,
             status="missing_log",
@@ -1637,7 +1651,7 @@ async def lora_training_status() -> LoraTrainingStatus:
             vram_percent=vram_percent,
             log_path=str(_LORA_TRAINING_LOG),
             updated_at=updated_at,
-            error="Training log not found",
+            error="Training log not found. Ensure training has started correctly.",
         )
 
     try:
@@ -1674,7 +1688,13 @@ async def lora_training_status() -> LoraTrainingStatus:
     completed = current_step >= total_steps
     completed = completed or final_checkpoint.is_file()
     completed = completed or "Done training" in log_text or "Training complete" in log_text
+    
     status = "completed" if completed else "training"
+
+    # If not completed, but the process has exited, it must have failed
+    if not completed and _TRAINING_PROCESS is not None and _TRAINING_PROCESS.returncode is not None:
+        if _TRAINING_PROCESS.returncode != 0:
+            status = "failed"
 
     # ai-toolkit can finish by writing the final unnumbered checkpoint after the last
     # progress line has already been emitted. In that case tqdm may leave the log at
@@ -1867,8 +1887,8 @@ def _build_training_config(req: LoraTrainingStartRequest) -> tuple[str, Path]:
         return stem, path
 
     job_name = req.job_name or f"chitramaya_{req.base_model}_{uuid.uuid4().hex[:6]}"
-    template_name = "flux2_identity_template.yaml" if req.base_model == "flux2" else "wan22_i2v_character_template.yaml"
-    template_path = Path(__file__).resolve().parents[2] / "training" / template_name
+    template_name = "image_lora_config.yaml" if req.base_model == "flux2" else "video_lora_config.yaml"
+    template_path = Path(__file__).resolve().parents[2] / "finetune" / template_name
 
     if not template_path.is_file():
         raise HTTPException(status_code=500, detail=f"Training template not found: {template_path}")
