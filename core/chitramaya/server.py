@@ -220,6 +220,7 @@ class ShotRecord(BaseModel):
     project_id: str | None = None
     scene_id: str | None = None
     shot_number: int = Field(ge=1)
+    title: str | None = None
     text: str | None = None
     description: str | None = None
     subtitle: str | None = None
@@ -890,7 +891,7 @@ async def patch_project_shot(project_id: str, scene_id: str, shot_id: str, patch
     current = await get_project_shot(project_id, scene_id, shot_id)
     if not current:
         raise HTTPException(status_code=404, detail="Shot not found")
-    allowed = {"shot_number", "text", "description", "subtitle", "voiceover", "image_prompt", "motion_prompt", "camera_motion", "characters", "duration_seconds", "status", "image_file", "video_file", "image_prompt_id", "video_prompt_id", "metadata"}
+    allowed = {"shot_number", "title", "text", "description", "subtitle", "voiceover", "speaker", "image_prompt", "motion_prompt", "camera_motion", "characters", "duration_seconds", "status", "image_file", "video_file", "image_prompt_id", "video_prompt_id", "metadata"}
     unknown = sorted(set(patch) - allowed)
     if unknown:
         raise HTTPException(status_code=400, detail=f"Unsupported shot fields: {', '.join(unknown)}")
@@ -1254,9 +1255,9 @@ async def render_project(project_id: str, background_tasks: BackgroundTasks) -> 
     if not ordered_shots:
         raise HTTPException(status_code=400, detail="Project has no shots")
 
-    missing = [s["id"] for s in ordered_shots if not s.get("video_file")]
+    missing = [s["id"] for s in ordered_shots if not s.get("video_file") and not s.get("image_file")]
     if missing:
-        raise HTTPException(status_code=400, detail=f"Shots missing video: {missing}")
+        raise HTTPException(status_code=400, detail=f"Shots missing media (neither video nor image): {missing}")
 
     render_id = _new_id("rnd")
     meta = dict(project.get("metadata") or {})

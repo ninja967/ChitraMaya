@@ -601,7 +601,7 @@ function ShotCard({ shot, phase, selected, saving, onSelect, onGenerateImage, on
           </div>
         )}
         <span className="absolute top-1.5 left-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-mono text-gray-200">
-          shot {shot.shot_number}
+          shot {shot.shot_number}{shot.title ? ` · ${shot.title}` : ""}
         </span>
         {videoUrl && (
           <span className="absolute top-1.5 right-1.5 rounded-md bg-violet-600/80 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-white inline-flex items-center gap-1">
@@ -675,29 +675,54 @@ interface ShotEditorProps {
 
 function ShotEditor({ shot, phase, saving, onPatch, onGenerate, onAnimate }: ShotEditorProps) {
   const [draft, setDraft] = useState({
+    title: shot.title || "",
     subtitle: shot.subtitle || "",
     description: shot.description || "",
     image_prompt: shot.image_prompt || "",
     motion_prompt: shot.motion_prompt || "",
+    speaker: shot.speaker || "narrator",
   });
+
+  const [characters, setCharacters] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/characters")
+      .then(r => r.json())
+      .then(d => setCharacters(d.characters || []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setDraft({
+      title: shot.title || "",
       subtitle: shot.subtitle || "",
       description: shot.description || "",
       image_prompt: shot.image_prompt || "",
       motion_prompt: shot.motion_prompt || "",
+      speaker: shot.speaker || "narrator",
     });
   }, [shot.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dirty =
+    draft.title !== (shot.title || "") ||
     draft.subtitle !== (shot.subtitle || "") ||
     draft.description !== (shot.description || "") ||
     draft.image_prompt !== (shot.image_prompt || "") ||
-    draft.motion_prompt !== (shot.motion_prompt || "");
+    draft.motion_prompt !== (shot.motion_prompt || "") ||
+    draft.speaker !== (shot.speaker || "narrator");
 
   return (
     <div className="space-y-4">
+      <Field label="Shot Title" hint="Internal heading for this shot.">
+        <input
+          type="text"
+          value={draft.title}
+          onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+          className="w-full rounded-lg bg-black/40 border border-gray-800 px-2.5 py-2 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50"
+          placeholder="e.g. Wide Reveal"
+        />
+      </Field>
+
       <Field label="Narration & Subtitle" hint="Viewer-facing narration. Generates high-quality AI voice-over and burns text into the final video.">
         <textarea
           value={draft.subtitle}
@@ -736,6 +761,19 @@ function ShotEditor({ shot, phase, saving, onPatch, onGenerate, onAnimate }: Sho
           className="w-full rounded-lg bg-black/40 border border-gray-800 px-2.5 py-2 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50 placeholder:text-gray-700 leading-relaxed font-mono"
           placeholder="Slow push in, suit plates locking into place."
         />
+      </Field>
+
+      <Field label="Speaker" hint="Who is speaking this narration?">
+        <select
+          value={draft.speaker}
+          onChange={(e) => setDraft((d) => ({ ...d, speaker: e.target.value }))}
+          className="w-full rounded-lg bg-black/40 border border-gray-800 px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50"
+        >
+          <option value="narrator">Default Narrator</option>
+          {characters.map((ch) => (
+            <option key={ch.id} value={ch.id}>{ch.name}</option>
+          ))}
+        </select>
       </Field>
 
       <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-500">
