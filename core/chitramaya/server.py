@@ -906,7 +906,9 @@ async def patch_project_shot(project_id: str, scene_id: str, shot_id: str, patch
     allowed = {"shot_number", "title", "text", "description", "subtitle", "voiceover", "speaker", "image_prompt", "motion_prompt", "camera_motion", "characters", "duration_seconds", "status", "image_file", "video_file", "image_prompt_id", "video_prompt_id", "metadata"}
     unknown = sorted(set(patch) - allowed)
     if unknown:
-        raise HTTPException(status_code=400, detail=f"Unsupported shot fields: {', '.join(unknown)}")
+        print(f"Warning: Ignoring unsupported shot fields: {', '.join(unknown)}")
+        for k in unknown:
+            patch.pop(k, None)
     current.update(patch)
     saved = await upsert_project_shot(current)
     return ShotRecord(**saved)

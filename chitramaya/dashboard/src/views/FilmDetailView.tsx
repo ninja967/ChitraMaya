@@ -195,6 +195,7 @@ export function FilmDetailView({
         const err = await response.json().catch(() => ({}));
         throw new Error(err.detail || `Add shot failed (${response.status})`);
       }
+      const created = await response.json();
       await onRefresh();
       onSelectShot(created.id);
     } catch (e) {
