@@ -139,7 +139,7 @@ You are the director. Your human pitched the idea. Your job is to take that pitc
 |---|---|
 | `title` | Short project name. Required. |
 | `description` | Optional one-line logline for display in the project list. The actual script lives in the scenes and shots, not here. |
-| `aspect_ratio` | `"9:16"` for shorts/TikTok (default), `"16:9"` landscape, `"1:1"` square. |
+| `aspect_ratio` | `"16:9"` cinematic landscape (default), `"9:16"` vertical/shorts, `"1:1"` square. |
 | `duration_seconds` | Target total runtime. Shorts are typically 10–90s. |
 | `characters` | Array of character IDs from `/api/characters` — e.g. the cast. |
 | `status` | `"draft"` (default), `"active"`, `"rendering"`, `"done"`. |
@@ -174,7 +174,7 @@ You are the director. Your human pitched the idea. Your job is to take that pitc
 
 Your human says: *"Put me in a power-suit launch scene — suit-up, launch, rooftop landing, the whole thing."*
 
-You decide: this is a project because it asks for a sequence of movie beats. Cast `maya_prototype`. Aspect `9:16`. ~30s. About 3 scenes, 1–3 shots each. Title: *Suit Up*.
+You decide: this is a project because it asks for a sequence of movie beats. Cast `maya_prototype`. Aspect `16:9`. ~30s. About 3 scenes, 1–3 shots each. Title: *Suit Up*.
 
 You POST the project:
 
@@ -182,7 +182,7 @@ You POST the project:
 {
   "title": "Suit Up",
   "description": "MayaPrototype suits up in a workshop and steps out into the rain.",
-  "aspect_ratio": "9:16",
+  "aspect_ratio": "16:9",
   "duration_seconds": 30,
   "characters": ["maya_prototype"]
 }

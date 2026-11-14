@@ -116,7 +116,7 @@ curl -sS -X POST http://127.0.0.1:8190/api/projects \
   -d '{
     "title": "Suit Up",
     "description": "Arjun suits up in his workshop and steps out into the rain.",
-    "aspect_ratio": "9:16",
+    "aspect_ratio": "16:9",
     "duration_seconds": 30,
     "characters": ["arjun"]
   }'

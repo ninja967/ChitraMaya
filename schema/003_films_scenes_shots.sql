@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS projects (
     title TEXT NOT NULL,
     content TEXT,
     synopsis TEXT,
-    aspect_ratio TEXT NOT NULL DEFAULT '9:16',
+    aspect_ratio TEXT NOT NULL DEFAULT '16:9',
     duration_seconds INT,
     status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'planning', 'ready', 'rendering', 'completed', 'failed')),
     characters JSONB NOT NULL DEFAULT '[]'::jsonb,
