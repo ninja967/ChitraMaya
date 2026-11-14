@@ -122,7 +122,7 @@ dashboard/                 # React/Vite Studio UI
 hosting/                   # Hugging Face Space Docker proxy
 infra/                     # AMD droplet bootstrap & model install
 finetune/                  # AI Toolkit YAML config templates
-schema/                    # PostgreSQL schema migrations
+migrations/                # PostgreSQL schema migrations
 docs/                      # Project briefs, hackathon notes, ROCm research
 AGENT.md                   # Agent integration instructions
 SHOWCASE.md                # Judge demo walkthrough

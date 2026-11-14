@@ -19,7 +19,7 @@ function normalizeApiUrl(value) {
 
 const apiTarget = normalizeApiUrl(process.env.CHITRAMAYA_API_URL || process.env.CHITRAMAYA_ENGINE_URL || "");
 const app = Fastify({ logger: true });
-const distDir = path.join(__dirname, "public");
+const distDir = fs.existsSync(path.join(__dirname, "public")) ? path.join(__dirname, "public") : path.join(__dirname, "dashboard", "dist");
 
 const backendProxy = apiTarget
   ? createProxyMiddleware({

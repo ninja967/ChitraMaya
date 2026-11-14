@@ -7,7 +7,7 @@ trap 'echo "ERROR: setup failed at line $LINENO"' ERR
 
 APT_GET="apt-get -o DPkg::Lock::Timeout=300"
 PYTHON_BIN="/root/comfyui-venv/bin/python"
-APP_REPO_URL="${APP_REPO_URL:-https://github.com/chitramaya-ai/chitramaya.git}"
+APP_REPO_URL="${APP_REPO_URL:-https://github.com/ninja967/ChitraMaya.git}"
 APP_DIR="${APP_DIR:-/root/chitramaya}"
 CHITRAMAYA_OUTPUT_DIR="${CHITRAMAYA_OUTPUT_DIR:-/root/ComfyUI/output}"
 COMFY_URL="${COMFY_URL:-http://127.0.0.1:8188}"

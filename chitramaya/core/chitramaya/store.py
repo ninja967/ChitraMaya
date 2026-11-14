@@ -11,8 +11,7 @@ import asyncpg
 from .settings import get_settings
 
 _pool: asyncpg.Pool | None = None
-_ROOT_DIR = Path(__file__).resolve().parents[2]
-_MIGRATIONS_DIR = _ROOT_DIR / "migrations" if (_ROOT_DIR / "migrations").exists() else _ROOT_DIR / "schema"
+_MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
 
 
 def get_pool() -> asyncpg.Pool:

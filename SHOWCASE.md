@@ -51,8 +51,8 @@ Upload a dataset of character images:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8190/api/datasets/upload \
-  -F "name=arjun-identity" \
-  -F "file=@arjun-dataset.zip"
+  -F "name=maya-prototype-identity" \
+  -F "file=@maya-prototype-dataset.zip"
 ```
 
 Start LoRA training on MI300X:
@@ -61,9 +61,9 @@ Start LoRA training on MI300X:
 curl -sS -X POST http://127.0.0.1:8190/api/lora-training/start \
   -H "Content-Type: application/json" \
   -d '{
-    "job_name": "arjun_flux2_v1",
-    "trigger_word": "Arjun",
-    "dataset_path": "/root/chitramaya-training/datasets/arjun-identity",
+    "job_name": "maya_prototype_flux2_v1",
+    "trigger_word": "MayaPrototype",
+    "dataset_path": "/root/chitramaya-training/datasets/maya-prototype-identity",
     "base_model": "flux2",
     "steps": 1800
   }'
@@ -83,8 +83,8 @@ Generate an image using the trained LoRA:
 curl -sS -X POST http://127.0.0.1:8190/api/image/generate \
   -H "Content-Type: application/json" \
   -d '{
-    "character": "arjun",
-    "prompt": "in an Iron Man suit, cinematic portrait, dramatic lighting"
+    "character": "maya_prototype",
+    "prompt": "in a custom power suit, cinematic portrait, dramatic lighting"
   }'
 ```
 
@@ -99,7 +99,7 @@ curl -sS -X POST http://127.0.0.1:8190/api/video/generate \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "i2v",
-    "character": "arjun",
+    "character": "maya_prototype",
     "prompt": "cinematic tracking shot, walking through neon rain",
     "width": 1280, "height": 720, "length": 121, "fps": 16
   }'
@@ -115,10 +115,10 @@ curl -sS -X POST http://127.0.0.1:8190/api/projects \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Suit Up",
-    "description": "Arjun suits up in his workshop and steps out into the rain.",
+    "description": "MayaPrototype suits up in a workshop and steps out into the rain.",
     "aspect_ratio": "16:9",
     "duration_seconds": 30,
-    "characters": ["arjun"]
+    "characters": ["maya_prototype"]
   }'
 ```
 
@@ -134,9 +134,9 @@ curl -sS -X POST http://127.0.0.1:8190/api/projects/{prj_id}/scenes/{scn_id}/sho
   -H "Content-Type: application/json" \
   -d '{
     "shot_number": 1,
-    "description": "Wide shot, Arjun standing on assembly platform, dramatic uplighting",
+    "description": "Wide shot, MayaPrototype standing on an assembly platform, dramatic uplighting",
     "subtitle": "Every hero has a moment where they stop being ordinary.",
-    "image_prompt": "Arjun, wide shot standing on industrial assembly platform, dramatic blue uplighting, cinematic",
+    "image_prompt": "MayaPrototype, wide shot standing on industrial assembly platform, dramatic blue uplighting, cinematic",
     "motion_prompt": "slow push in, machinery activating around subject"
   }'
 ```
@@ -205,8 +205,8 @@ The React-based Studio UI provides:
 
 ```bash
 # 1. Clone repo
-git clone https://github.com/chitramaya-ai/chitramaya.git
-cd chitramaya
+git clone https://github.com/ninja967/ChitraMaya.git
+cd ChitraMaya
 
 # 2. Bootstrap AMD droplet
 # (on a DigitalOcean MI300X ROCm droplet)

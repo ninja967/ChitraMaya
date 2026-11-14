@@ -2,16 +2,11 @@ FROM node:22-slim
 
 WORKDIR /app
 
-COPY package.json ./
+COPY package*.json ./
+RUN npm ci --omit=dev
+
 COPY proxy.js ./
-COPY dashboard ./dashboard
-
-WORKDIR /app/dashboard
-RUN npm ci
-RUN npm run build
-
-WORKDIR /app
-RUN npm install --omit=dev
+COPY public ./public
 
 ENV PORT=7860
 EXPOSE 7860

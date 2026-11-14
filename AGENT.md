@@ -12,7 +12,7 @@ You are reading this to learn how to use ChitraMaya to make images and videos fo
 | Mode | Use when your human… | API surface |
 |---|---|---|
 | **Studio** | …wants a quick image or short clip, freeform exploration, no narrative. | `/api/image/generate`, `/api/video/generate`, `/api/listing` |
-| **Projects** | …pitches a *concept* — a story, a video idea, "put me in an Iron Man movie", a beat sequence with multiple shots. | `/api/projects/...` |
+| **Projects** | …pitches a *concept* — a story, a video idea, "put me in a power-suit launch scene", a beat sequence with multiple shots. | `/api/projects/...` |
 
 
 
@@ -44,7 +44,7 @@ curl -sS "$CHITRAMAYA_API_URL/api/characters"
 For direct Studio generation, pass one character with the `character` shortcut:
 
 ```json
-{"character":"arjun","prompt":"dashboard portrait, dramatic light"}
+{"character":"maya_prototype","prompt":"dashboard portrait, dramatic light"}
 ```
 
 For advanced multi-character control, pass `characters` as character binding objects:
@@ -52,7 +52,7 @@ For advanced multi-character control, pass `characters` as character binding obj
 ```json
 {
   "characters": [
-    {"id":"arjun","role":"hero","lora_strength":1.0}
+    {"id":"maya_prototype","role":"hero","lora_strength":1.0}
   ],
   "prompt":"cinematic hero shot in neon rain"
 }
@@ -67,7 +67,7 @@ Do not claim ChitraMaya can train a LoRA from this skill alone. The current back
 ```bash
 curl -sS -X POST "$CHITRAMAYA_API_URL/api/image/generate" \
   -H "Content-Type: application/json" \
-  -d '{"character":"arjun","prompt":"in an open-helmet Iron Man suit getting ready to take-off"}'
+  -d '{"character":"maya_prototype","prompt":"in an open-helmet power suit getting ready to take off"}'
 ```
 
 ## Text-to-video
@@ -108,7 +108,7 @@ A **Project** is a script. The script breaks into **Scenes**. Each scene breaks 
 Projects, scenes, and shots use `characters` as an array of character ID strings:
 
 ```json
-{"characters":["arjun"]}
+{"characters":["maya_prototype"]}
 ```
 
 Set the broad cast on the project. Override/narrow the cast on a scene or shot only when that beat needs a different set of characters. When rendering a project shot, the backend resolves characters in this order: shot `characters`, then scene `characters`, then project `characters`.
@@ -117,7 +117,7 @@ You are the director. Your human pitched the idea. Your job is to take that pitc
 
 ## Your flow
 
-1. **Hear the pitch.** Decide whether it is clearly multi-shot. "Make a trailer of me becoming Iron Man" is a project. "Make me look like Iron Man" is Studio. If unclear, ask: "Do you want one image/clip for fun, or a multi-shot stitched together into a legit final output (think TikTok video)?"
+1. **Hear the pitch.** Decide whether it is clearly multi-shot. "Make a trailer of me becoming a power-suit pilot" is a project. "Make me look like a power-suit pilot" is Studio. If unclear, ask: "Do you want one image/clip for fun, or a multi-shot stitched together into a legit final output (think TikTok video)?"
 2. **Draft the project record only after the request is clearly a project.** Decide a `title` and a one-line `description`. Pick `aspect_ratio`. Estimate `duration_seconds`. List which `characters` to cast. The script itself lives in the scenes and shots you'll add next.
 3. **POST `/api/projects`** — you'll get back the project `id`.
 4. **Break the script into scenes.** POST `/api/projects/{prj_id}/scenes` for each beat.
@@ -170,27 +170,27 @@ You are the director. Your human pitched the idea. Your job is to take that pitc
 | `duration_seconds` | Clip length when animated. Default 5. |
 | `characters` | IDs of characters in this shot. |
 
-## Worked example: "Put me in an Iron Man movie"
+## Worked example: "Put me in a power-suit launch scene"
 
-Your human says: *"Put me in an Iron Man movie — suit-up, launch, rooftop landing, the whole thing."*
+Your human says: *"Put me in a power-suit launch scene — suit-up, launch, rooftop landing, the whole thing."*
 
-You decide: this is a project because it asks for a sequence of movie beats. Cast `arjun`. Aspect `16:9`. ~30s. About 3 scenes, 1–3 shots each. Title: *Suit Up*.
+You decide: this is a project because it asks for a sequence of movie beats. Cast `maya_prototype`. Aspect `16:9`. ~30s. About 3 scenes, 1–3 shots each. Title: *Suit Up*.
 
 You POST the project:
 
 ```json
 {
   "title": "Suit Up",
-  "description": "Arjun suits up in his workshop and steps out into the rain.",
+  "description": "MayaPrototype suits up in a workshop and steps out into the rain.",
   "aspect_ratio": "16:9",
   "duration_seconds": 30,
-  "characters": ["arjun"]
+  "characters": ["maya_prototype"]
 }
 ```
 
 Then your scenes — `1: INT. WORKSHOP - NIGHT`, `2: INT. WORKSHOP - SUIT ASSEMBLY`, `3: EXT. CITY ROOFTOP - RAIN`.
 
-Then your shots — for scene 2: `shot 1: wide of Arjun on the assembly platform`, `shot 2: medium of chest plate locking in`, `shot 3: close on the helmet snapping shut, eyes glow blue`. Each gets an `image_prompt` and `motion_prompt`.
+Then your shots — for scene 2: `shot 1: wide of MayaPrototype on the assembly platform`, `shot 2: medium of chest plate locking in`, `shot 3: close on the helmet snapping shut, eyes glow blue`. Each gets an `image_prompt` and `motion_prompt`.
 
 Then you stop, point your human at the Projects page, and say something like *"I drafted Suit Up — three scenes, seven shots. Take a look. Want to change any of the beats before I start generating?"* Iterate. Only when they approve the outline do you start hitting `/generate-image`.
 

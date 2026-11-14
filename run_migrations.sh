@@ -1,6 +1,9 @@
 #!/bin/bash
 MIGRATIONS_DIR="/root/chitramaya/migrations"
 if [ ! -d "$MIGRATIONS_DIR" ]; then
+    MIGRATIONS_DIR="/root/migrations"
+fi
+if [ ! -d "$MIGRATIONS_DIR" ]; then
     MIGRATIONS_DIR="/root/chitramaya/schema"
 fi
 dos2unix "$MIGRATIONS_DIR"/*.sql 2>/dev/null
