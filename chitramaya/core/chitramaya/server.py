@@ -16,7 +16,8 @@ from urllib.parse import urlparse, urlunparse
 import httpx
 import websockets
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .bridge import ComfyClient
@@ -24,11 +25,159 @@ from .settings import ComfyNode, get_settings
 from .store import close_db, delete_character, delete_media_rows, delete_project, delete_project_scene, delete_project_shot, get_character, get_job, get_project, get_project_scene, get_project_shot, get_project_shot_version, get_project_shot_version_by_prompt, init_db, list_characters, list_jobs, list_media, list_project_scenes, list_project_shot_versions, list_project_shots, list_projects, media_count, next_shot_version_number, save_job, update_job_metadata, update_job_status, upsert_character, upsert_media, upsert_project, upsert_project_scene, upsert_project_shot, upsert_project_shot_version, utc_from_timestamp
 from .pipelines import WAN_NEGATIVE, build_flux2_lora_image, build_wan22_i2v, build_wan22_t2v
 
+# ── SSE Events ──
+_event_queues: list[asyncio.Queue] = []
+
+
+async def broadcast_event(event_type: str, data: dict[str, Any]) -> None:
+    """Send an event to all connected SSE clients."""
+    payload = json.dumps({"type": event_type, "timestamp": datetime.now(UTC).isoformat(), **data})
+    for queue in _event_queues:
+        await queue.put(payload)
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await init_db()
+    # Sync first 100 media items on start to ensure gallery is populated
+    asyncio.create_task(_sync_filesystem_media(limit=100))
+    yield
+    # Shutdown
+    await close_db()
+
+
 app = FastAPI(
     title="ChitraMaya Engine API",
     description="Agent-native API for driving ComfyUI video generation on AMD GPUs.",
     version="0.1.0",
+    lifespan=lifespan,
 )
+
+
+@app.get("/api/events")
+async def events(request: Request):
+    """Server-Sent Events endpoint for real-time job and node updates."""
+
+    async def event_generator():
+        queue = asyncio.Queue()
+        _event_queues.append(queue)
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                data = await queue.get()
+                yield f"data: {data}\n\n"
+        finally:
+            if queue in _event_queues:
+                _event_queues.remove(queue)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.get("/api/tts/voices")
+async def list_tts_voices() -> dict[str, Any]:
+    """List available ElevenLabs voices for TTS."""
+    voices = await _tts_voices()
+    return {"voices": voices}
+
+
+# ── ElevenLabs TTS ──
+ELEVENLABS_VOICE_ID = "CwhRBWXzGAHq8TQ4Fs17"  # Roger — Laid-Back, Casual, Resonant
+
+
+class VoiceConfig(BaseModel):
+    voice_id: str | None = None
+    stability: float = 0.5
+    similarity_boost: float = 0.75
+    style: float = 0.0
+    use_speaker_boost: bool = True
+
+
+async def _generate_tts(text: str, output_path: Path, voice_id: str | None = None, voice_settings: VoiceConfig | None = None) -> tuple[bool, float | None]:
+    """Generate TTS audio via ElevenLabs with-timestamps endpoint."""
+    settings = get_settings()
+    api_key = settings.elevenlabs_api_key
+    if not api_key:
+        return False, None
+    payload: dict[str, Any] = {
+        "text": text,
+        "model_id": "eleven_multilingual_v2",
+    }
+    vs = voice_settings.model_dump() if voice_settings else {}
+    payload["voice_settings"] = {
+        "stability": vs.get("stability", 0.6),
+        "similarity_boost": vs.get("similarity_boost", 0.8),
+        "style": vs.get("style", 0.2),
+        "use_speaker_boost": vs.get("use_speaker_boost", True),
+    }
+    import base64
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            resp = await client.post(
+                f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id or ELEVENLABS_VOICE_ID}/with-timestamps",
+                headers={"xi-api-key": api_key, "Content-Type": "application/json"},
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            audio_bytes = base64.b64decode(data["audio_base64"])
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(audio_bytes)
+            alignment = data["alignment"]
+            end_times = alignment["character_end_times_seconds"]
+            speech_end = float(end_times[-1])
+            return True, speech_end
+        except Exception:
+            return False, None
+
+
+async def _tts_voices() -> list[dict[str, Any]]:
+    """List available ElevenLabs voices."""
+    settings = get_settings()
+    api_key = settings.elevenlabs_api_key
+    if not api_key:
+        return []
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(
+                "https://api.elevenlabs.io/v1/voices",
+                headers={"xi-api-key": api_key},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return [
+                {
+                    "voice_id": v.get("voice_id"),
+                    "name": v.get("name"),
+                    "category": v.get("category"),
+                    "labels": v.get("labels", {}),
+                    "description": v.get("description"),
+                }
+                for v in data.get("voices", [])
+            ]
+    except Exception:
+        return []
+
+
+async def _resolve_voice(speaker: str | None, project: dict[str, Any]) -> tuple[str | None, VoiceConfig | None]:
+    """Return (voice_id, voice_settings) for a speaker."""
+    if not speaker or speaker == "narrator":
+        nv = project.get("narrator_voice")
+        if nv:
+            if isinstance(nv, dict):
+                return nv.get("voice_id"), VoiceConfig(**nv)
+            return nv.voice_id, nv
+        return ELEVENLABS_VOICE_ID, None
+
+    record = await get_character(speaker)
+    if record and record.get("voice"):
+        v = record["voice"]
+        if isinstance(v, dict):
+            return v.get("voice_id"), VoiceConfig(**v)
+        return v.voice_id, v
+
+    return ELEVENLABS_VOICE_ID, None
 
 
 class CharacterBinding(BaseModel):
@@ -951,81 +1100,146 @@ async def _set_render_status(project_id: str, status: str, error: str | None = N
 
 
 async def _run_render(project_id: str, shots: list[dict[str, Any]], render_id: str) -> None:
+    """Upgraded render pipeline with audio mixing, subtitle burning, and job broadcasting."""
     out_path = (_OUTPUT_DIR / f"projects/{project_id}/render-{render_id}.mp4").resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    clip_pairs: list[tuple[Path, dict[str, Any]]] = []
-    for shot in shots:
-        p = (_OUTPUT_DIR / shot["video_file"]).resolve()
-        if not p.is_file():
-            await _set_render_status(project_id, "failed", f"Missing clip for shot {shot['id']}: {shot['video_file']}")
-            return
-        clip_pairs.append((p, shot))
+    await broadcast_event("job_update", {"job_id": render_id, "project_id": project_id, "status": "rendering", "progress": 5})
 
-    concat_tmp = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, prefix="cm_concat_")
-    try:
-        for p, _ in clip_pairs:
-            concat_tmp.write(f"file '{p}'\n")
-        concat_tmp.flush()
-        concat_path = concat_tmp.name
-    finally:
-        concat_tmp.close()
-
-    srt_path: str | None = None
-    srt_entries: list[str] = []
-    cumulative = 0.0
-    for idx, (_, shot) in enumerate(clip_pairs, start=1):
-        duration = float(shot.get("duration_seconds") or 5)
-        subtitle = (shot.get("subtitle") or "").strip()
-        if subtitle:
-            srt_entries.append(
-                f"{idx}\n{_srt_timestamp(cumulative)} --> {_srt_timestamp(cumulative + duration)}\n{subtitle}\n"
-            )
-        cumulative += duration
-
-    if srt_entries:
-        srt_tmp = tempfile.NamedTemporaryFile("w", suffix=".srt", delete=False, prefix="cm_srt_")
-        try:
-            srt_tmp.write("\n".join(srt_entries))
-            srt_tmp.flush()
-            srt_path = srt_tmp.name
-        finally:
-            srt_tmp.close()
-
-    cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_path]
-    if srt_path:
-        style = "FontSize=22,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Alignment=2"
-        cmd += ["-vf", f"subtitles={srt_path}:force_style='{style}'", "-c:v", "libx264", "-preset", "fast", "-crf", "23"]
-    else:
-        cmd += ["-c:v", "copy"]
-    cmd += ["-an", str(out_path)]
-
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    _, stderr = await proc.communicate()
-
-    Path(concat_path).unlink(missing_ok=True)
-    if srt_path:
-        Path(srt_path).unlink(missing_ok=True)
-
-    if proc.returncode != 0:
-        err = stderr.decode(errors="replace")[-800:]
-        await _set_render_status(project_id, "failed", err)
+    project = await get_project(project_id)
+    if not project:
+        await _set_render_status(project_id, "failed", "Project not found")
         return
 
-    stat = out_path.stat()
-    rel = str(out_path.relative_to(_OUTPUT_DIR))
-    await upsert_media({
-        "filename": rel,
-        "type": "video",
-        "size": stat.st_size,
-        "workflow_type": "project_render",
-        "prompt": project_id,
-    })
-    await _set_render_status(project_id, "completed", final_video=rel)
+    processed_clips: list[Path] = []
+    srt_entries: list[str] = []
+    cumulative_time = 0.0
+
+    try:
+        for idx, shot in enumerate(shots, start=1):
+            shot_id = shot["id"]
+            progress = 5 + int((idx / len(shots)) * 80)
+            await broadcast_event("job_update", {"job_id": render_id, "project_id": project_id, "status": "rendering", "message": f"Processing shot {idx}/{len(shots)}", "progress": progress})
+
+            # 1. Resolve Clip Source (Video or frozen Image)
+            video_file = shot.get("video_file")
+            clip_path: Path | None = None
+            if video_file:
+                clip_path = (_OUTPUT_DIR / video_file).resolve()
+            
+            if not clip_path or not clip_path.is_file():
+                # Fallback to image freezing if video is missing but image exists
+                image_file = shot.get("image_file")
+                if image_file:
+                    img_path = (_OUTPUT_DIR / image_file).resolve()
+                    if img_path.is_file():
+                        frozen_video = img_path.with_suffix(".frozen.mp4")
+                        duration = float(shot.get("duration_seconds") or 5)
+                        # Freeze image to video
+                        freeze_cmd = [
+                            "ffmpeg", "-y", "-loop", "1", "-i", str(img_path),
+                            "-c:v", "libx264", "-t", str(duration), "-pix_fmt", "yuv420p",
+                            "-vf", f"scale=trunc(iw/2)*2:trunc(ih/2)*2", str(frozen_video)
+                        ]
+                        proc = await asyncio.create_subprocess_exec(*freeze_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                        await proc.communicate()
+                        clip_path = frozen_video
+                
+            if not clip_path or not clip_path.is_file():
+                await _set_render_status(project_id, "failed", f"Missing media for shot {shot_id}")
+                return
+
+            # 2. TTS Generation
+            audio_path: Path | None = None
+            voiceover_text = shot.get("voiceover") or shot.get("subtitle")
+            if voiceover_text and voiceover_text.strip():
+                audio_path = out_path.parent / f"shot-{shot_id}-audio.mp3"
+                voice_id, voice_settings = await _resolve_voice(shot.get("speaker"), project)
+                ok, speech_end = await _generate_tts(voiceover_text, audio_path, voice_id=voice_id, voice_settings=voice_settings)
+                if not ok:
+                    audio_path = None
+
+            # 3. Mix Shot (Video + Audio)
+            mixed_clip = out_path.parent / f"shot-{shot_id}-mixed.mp4"
+            duration = float(shot.get("duration_seconds") or 5)
+            mix_cmd = ["ffmpeg", "-y", "-i", str(clip_path)]
+            if audio_path:
+                mix_cmd += ["-i", str(audio_path), "-filter_complex", "[0:v]setpts=PTS-STARTPTS[v];[1:a]asetpts=PTS-STARTPTS[a]", "-map", "[v]", "-map", "[a]"]
+            else:
+                mix_cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-map", "0:v", "-map", "1:a"]
+            
+            mix_cmd += ["-t", str(duration), "-c:v", "libx264", "-pix_fmt", "yuv420p", str(mixed_clip)]
+            
+            proc = await asyncio.create_subprocess_exec(*mix_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            await proc.communicate()
+            
+            if mixed_clip.is_file():
+                processed_clips.append(mixed_clip)
+                subtitle = (shot.get("subtitle") or "").strip()
+                if subtitle:
+                    srt_entries.append(
+                        f"{len(processed_clips)}\n{_srt_timestamp(cumulative_time)} --> {_srt_timestamp(cumulative_time + duration)}\n{subtitle}\n"
+                    )
+                cumulative_time += duration
+
+        if not processed_clips:
+            await _set_render_status(project_id, "failed", "No clips processed")
+            return
+
+        # 4. Final Concat & Subtitle Burn
+        concat_tmp = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, prefix="cm_concat_")
+        for p in processed_clips:
+            concat_tmp.write(f"file '{p.resolve()}'\n")
+        concat_tmp.close()
+
+        srt_path: str | None = None
+        if srt_entries:
+            srt_tmp = tempfile.NamedTemporaryFile("w", suffix=".srt", delete=False, prefix="cm_srt_", encoding="utf-8")
+            srt_tmp.write("\n".join(srt_entries))
+            srt_tmp.close()
+            srt_path = srt_tmp.name
+
+        cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_tmp.name]
+        if srt_path:
+            style = "FontSize=22,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Alignment=2"
+            normalized_srt = srt_path.replace("\\", "/")
+            if ":" in normalized_srt:
+                normalized_srt = normalized_srt.replace(":", "\\:")
+            cmd += ["-vf", f"subtitles={normalized_srt}:force_style='{style}'"]
+        
+        cmd += ["-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-b:a", "192k", str(out_path)]
+
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        _, stderr = await proc.communicate()
+
+        Path(concat_tmp.name).unlink(missing_ok=True)
+        if srt_path:
+            Path(srt_path).unlink(missing_ok=True)
+
+        if proc.returncode != 0:
+            err = stderr.decode(errors="replace")[-800:]
+            await _set_render_status(project_id, "failed", err)
+            return
+
+        for p in processed_clips:
+            if "shot-" in p.name and "-mixed.mp4" in p.name:
+                p.unlink(missing_ok=True)
+
+        stat = out_path.stat()
+        rel = str(out_path.relative_to(_OUTPUT_DIR))
+        await upsert_media({
+            "filename": rel,
+            "type": "video",
+            "size": stat.st_size,
+            "workflow_type": "project_render",
+            "prompt": project_id,
+        })
+        await _set_render_status(project_id, "completed", final_video=rel)
+        await broadcast_event("job_update", {"job_id": render_id, "project_id": project_id, "status": "completed", "progress": 100, "output": rel})
+
+    except Exception as e:
+        await _set_render_status(project_id, "failed", str(e))
+        await broadcast_event("job_update", {"job_id": render_id, "project_id": project_id, "status": "failed", "error": str(e)})
 
 
 @app.post("/api/projects/{project_id}/render")

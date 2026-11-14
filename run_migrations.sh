@@ -1,6 +1,11 @@
 #!/bin/bash
-dos2unix /root/chitramaya/schema/*.sql 2>/dev/null
-for f in /root/chitramaya/schema/*.sql; do
+MIGRATIONS_DIR="/root/chitramaya/migrations"
+if [ ! -d "$MIGRATIONS_DIR" ]; then
+    MIGRATIONS_DIR="/root/chitramaya/schema"
+fi
+dos2unix "$MIGRATIONS_DIR"/*.sql 2>/dev/null
+for f in $(ls "$MIGRATIONS_DIR"/*.sql 2>/dev/null | sort); do
+    [ -f "$f" ] || continue
     PGPASSWORD=chitramaya_pass psql -U chitramaya -h localhost -d chitramaya -f "$f"
     echo "Applied: $f"
 done

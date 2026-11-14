@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Film, Image as ImageIcon, Video, Wand2, Plus, Save, Layers, Sparkles, Edit3, Play, ArrowLeft, Trash2, Clapperboard, Loader2 } from "lucide-react";
+import { Film, Image as ImageIcon, Video, Wand2, Plus, Save, Layers, Sparkles, Edit3, Play, ArrowLeft, Trash2, Clapperboard, Loader2, Download } from "lucide-react";
 import type { JobItem, Project, Scene, Shot, ShotVersion, FilmPhase } from "../models";
 
 interface FilmDetailViewProps {
@@ -119,6 +119,46 @@ export function FilmDetailView({
       (!!job && (job.status === 'pending' || job.status === 'running'));
   }
 
+  async function patchProject(patch: Partial<Project>) {
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Project update failed (${response.status})`);
+      }
+      await onRefresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save project");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function patchScene(sceneId: string, patch: Partial<Scene>) {
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/projects/${project.id}/scenes/${sceneId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Scene update failed (${response.status})`);
+      }
+      await onRefresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save scene");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function patchShot(shotId: string, patch: Partial<Shot>) {
     const shot = shots.find((s) => s.id === shotId);
     if (!shot) return;
@@ -129,7 +169,10 @@ export function FilmDetailView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
-      if (!response.ok) throw new Error(`Patch failed: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Shot update failed (${response.status})`);
+      }
       await onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save shot");
@@ -148,7 +191,10 @@ export function FilmDetailView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ shot_number: next, description: "" }),
       });
-      if (!response.ok) throw new Error(`Add shot failed: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Add shot failed (${response.status})`);
+      }
       const created = await response.json();
       await onRefresh();
       onSelectShot(created.id);
@@ -164,7 +210,10 @@ export function FilmDetailView({
     setSaving(true);
     try {
       const response = await fetch(`/api/projects/${project.id}/scenes/${shot.scene_id}/shots/${shot.id}/generate-image`, { method: "POST" });
-      if (!response.ok) throw new Error(`Generate failed: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Generation failed (${response.status})`);
+      }
       await onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to generate image");
@@ -178,7 +227,10 @@ export function FilmDetailView({
     setSaving(true);
     try {
       const response = await fetch(`/api/projects/${project.id}/scenes/${shot.scene_id}/shots/${shot.id}/animate`, { method: "POST" });
-      if (!response.ok) throw new Error(`Animate failed: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Animation failed (${response.status})`);
+      }
       await onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to animate");
@@ -234,14 +286,23 @@ export function FilmDetailView({
             </button>
           )}
           {renderStatus === "completed" && finalVideoUrl && (
-            <a
-              href={finalVideoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-600/15 hover:bg-emerald-600/25 px-3 py-1.5 text-xs font-medium text-emerald-100 transition"
-            >
-              <Play className="w-3.5 h-3.5" /> Watch final video
-            </a>
+            <div className="flex gap-1.5">
+              <a
+                href={finalVideoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-600/15 hover:bg-emerald-600/25 px-3 py-1.5 text-xs font-medium text-emerald-100 transition"
+              >
+                <Play className="w-3.5 h-3.5" /> Watch
+              </a>
+              <a
+                href={finalVideoUrl}
+                download="final-render"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-gray-300 transition"
+              >
+                <Download className="w-3.5 h-3.5" /> Save
+              </a>
+            </div>
           )}
         </div>
       </div>
@@ -340,29 +401,30 @@ export function FilmDetailView({
           </div>
         </main>
 
-        {/* Right: context-aware editor — styled to match ControlPanel */}
-        <aside className="w-[340px] flex-shrink-0 border-l border-gray-800/60 bg-gray-950/40 flex flex-col">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800/40 flex-shrink-0">
-            <span className="text-sm font-semibold text-gray-300 tracking-tight">
-              {selectedShot ? `Shot ${selectedShot.shot_number}` : selectedScene ? `Scene ${selectedScene.scene_number}` : "Project"}
-            </span>
-            <span className="text-[10px] uppercase tracking-wider text-gray-600">{phase}</span>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+        {/* Right: context-aware editor */}
+        <aside className="w-80 border-l border-gray-800/60 bg-gray-950/60 flex flex-col overflow-hidden flex-shrink-0">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
             {selectedShot ? (
               <ShotEditor
                 shot={selectedShot}
                 phase={phase}
                 saving={saving}
-                onPatch={(patch) => patchShot(selectedShot.id, patch)}
+                onPatch={(p) => patchShot(selectedShot.id, p)}
                 onGenerate={() => generateImage(selectedShot)}
                 onAnimate={() => animateShot(selectedShot)}
               />
             ) : selectedScene ? (
-              <SceneSummary scene={selectedScene} />
+              <SceneEditor
+                scene={selectedScene}
+                saving={saving}
+                onPatch={(p) => patchScene(selectedScene.id, p)}
+              />
             ) : (
-              <ProjectSummary project={project} />
+              <ProjectEditor
+                project={project}
+                saving={saving}
+                onPatch={patchProject}
+              />
             )}
           </div>
         </aside>
@@ -566,7 +628,7 @@ function ShotCard({ shot, phase, selected, saving, onSelect, onGenerateImage, on
           </div>
         )}
         <span className="absolute top-1.5 left-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-mono text-gray-200">
-          shot {shot.shot_number}
+          shot {shot.shot_number}{shot.title ? ` · ${shot.title}` : ""}
         </span>
         {videoUrl && (
           <span className="absolute top-1.5 right-1.5 rounded-md bg-violet-600/80 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-white inline-flex items-center gap-1">
@@ -640,30 +702,55 @@ interface ShotEditorProps {
 
 function ShotEditor({ shot, phase, saving, onPatch, onGenerate, onAnimate }: ShotEditorProps) {
   const [draft, setDraft] = useState({
+    title: shot.title || "",
     subtitle: shot.subtitle || "",
     description: shot.description || "",
     image_prompt: shot.image_prompt || "",
     motion_prompt: shot.motion_prompt || "",
+    speaker: shot.speaker || "narrator",
   });
+
+  const [characters, setCharacters] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/characters")
+      .then(r => r.json())
+      .then(d => setCharacters(d.characters || []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setDraft({
+      title: shot.title || "",
       subtitle: shot.subtitle || "",
       description: shot.description || "",
       image_prompt: shot.image_prompt || "",
       motion_prompt: shot.motion_prompt || "",
+      speaker: shot.speaker || "narrator",
     });
   }, [shot.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dirty =
+    draft.title !== (shot.title || "") ||
     draft.subtitle !== (shot.subtitle || "") ||
     draft.description !== (shot.description || "") ||
     draft.image_prompt !== (shot.image_prompt || "") ||
-    draft.motion_prompt !== (shot.motion_prompt || "");
+    draft.motion_prompt !== (shot.motion_prompt || "") ||
+    draft.speaker !== (shot.speaker || "narrator");
 
   return (
     <div className="space-y-4">
-      <Field label="Subtitle" hint="Viewer-facing narration. Burned onto the final video.">
+      <Field label="Shot Title" hint="Internal heading for this shot.">
+        <input
+          type="text"
+          value={draft.title}
+          onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+          className="w-full rounded-lg bg-black/40 border border-gray-800 px-2.5 py-2 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50"
+          placeholder="e.g. Wide Reveal"
+        />
+      </Field>
+
+      <Field label="Narration & Subtitle" hint="Viewer-facing narration. Generates high-quality AI voice-over and burns text into the final video.">
         <textarea
           value={draft.subtitle}
           onChange={(e) => setDraft((d) => ({ ...d, subtitle: e.target.value }))}
@@ -701,6 +788,19 @@ function ShotEditor({ shot, phase, saving, onPatch, onGenerate, onAnimate }: Sho
           className="w-full rounded-lg bg-black/40 border border-gray-800 px-2.5 py-2 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50 placeholder:text-gray-700 leading-relaxed font-mono"
           placeholder="Slow push in, suit plates locking into place."
         />
+      </Field>
+
+      <Field label="Speaker" hint="Who is speaking this narration?">
+        <select
+          value={draft.speaker}
+          onChange={(e) => setDraft((d) => ({ ...d, speaker: e.target.value }))}
+          className="w-full rounded-lg bg-black/40 border border-gray-800 px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50"
+        >
+          <option value="narrator">Default Narrator</option>
+          {characters.map((ch) => (
+            <option key={ch.id} value={ch.id}>{ch.name}</option>
+          ))}
+        </select>
       </Field>
 
       <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-500">
@@ -808,38 +908,170 @@ function ProjectSummary({ project }: { project: Project }) {
   );
 }
 
-function SceneSummary({ scene }: { scene: Scene }) {
+function SceneEditor({ scene, saving, onPatch }: { scene: Scene; saving: boolean; onPatch: (p: Partial<Scene>) => void }) {
+  const [draft, setDraft] = useState({
+    title: scene.title || "",
+    summary: scene.summary || "",
+    setting: scene.setting || "interior",
+    weather: scene.weather || "clear",
+    location: scene.location || "",
+    time_of_day: scene.time_of_day || "",
+  });
+
+  useEffect(() => {
+    setDraft({
+      title: scene.title || "",
+      summary: scene.summary || "",
+      setting: scene.setting || "interior",
+      weather: scene.weather || "clear",
+      location: scene.location || "",
+      time_of_day: scene.time_of_day || "",
+    });
+  }, [scene.id]);
+
+  const dirty =
+    draft.title !== (scene.title || "") ||
+    draft.summary !== (scene.summary || "") ||
+    draft.setting !== (scene.setting || "interior") ||
+    draft.weather !== (scene.weather || "clear") ||
+    draft.location !== (scene.location || "") ||
+    draft.time_of_day !== (scene.time_of_day || "");
+
   return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-[11px] font-medium text-gray-300">Title</p>
-        <p className="text-sm text-gray-100 mt-0.5">{scene.title || "Untitled scene"}</p>
+    <div className="space-y-4">
+      <Field label="Scene Title" hint="Heading for this scene.">
+        <input
+          type="text"
+          value={draft.title}
+          onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+          className="w-full rounded-lg bg-black/40 border border-gray-800 px-2.5 py-2 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50"
+          placeholder="SCENE TITLE"
+        />
+      </Field>
+
+      <Field label="Summary" hint="Overall mood and action of the scene.">
+        <textarea
+          value={draft.summary}
+          onChange={(e) => setDraft((d) => ({ ...d, summary: e.target.value }))}
+          rows={3}
+          className="w-full rounded-lg bg-black/40 border border-gray-800 px-2.5 py-2 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50 leading-relaxed"
+          placeholder="Brief scene overview..."
+        />
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Setting">
+          <select
+            value={draft.setting}
+            onChange={(e) => setDraft((d) => ({ ...d, setting: e.target.value }))}
+            className="w-full rounded-lg bg-black/40 border border-gray-800 px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50"
+          >
+            <option value="interior">Interior</option>
+            <option value="exterior">Exterior</option>
+          </select>
+        </Field>
+        <Field label="Weather">
+          <select
+            value={draft.weather}
+            onChange={(e) => setDraft((d) => ({ ...d, weather: e.target.value }))}
+            className="w-full rounded-lg bg-black/40 border border-gray-800 px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50"
+          >
+            <option value="clear">Clear</option>
+            <option value="rain">Rain</option>
+            <option value="snow">Snow</option>
+            <option value="overcast">Overcast</option>
+          </select>
+        </Field>
       </div>
-      <div>
-        <p className="text-[11px] font-medium text-gray-300">Summary</p>
-        <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{scene.summary || <span className="italic text-gray-600">no summary</span>}</p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Location">
+          <input
+            type="text"
+            value={draft.location}
+            onChange={(e) => setDraft((d) => ({ ...d, location: e.target.value }))}
+            className="w-full rounded-lg bg-black/40 border border-gray-800 px-2.5 py-2 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50"
+            placeholder="e.g. Lab"
+          />
+        </Field>
+        <Field label="Time of Day">
+          <input
+            type="text"
+            value={draft.time_of_day}
+            onChange={(e) => setDraft((d) => ({ ...d, time_of_day: e.target.value }))}
+            className="w-full rounded-lg bg-black/40 border border-gray-800 px-2.5 py-2 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50"
+            placeholder="e.g. Dusk"
+          />
+        </Field>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-[11px]">
-        <div className="rounded-lg border border-gray-800 bg-gray-900/40 px-2.5 py-1.5">
-          <p className="text-gray-600 text-[10px] uppercase tracking-wider">Setting</p>
-          <p className="text-gray-300 mt-0.5 capitalize">{scene.setting}</p>
+
+      <button
+        onClick={() => onPatch(draft)}
+        disabled={!dirty || saving}
+        className="w-full mt-2 inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/60 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-2 text-xs font-medium text-gray-200 transition"
+      >
+        <Save className="w-3.5 h-3.5" /> {saving ? "Saving…" : dirty ? "Save changes" : "Saved"}
+      </button>
+    </div>
+  );
+}
+
+function ProjectEditor({ project, saving, onPatch }: { project: Project; saving: boolean; onPatch: (p: Partial<Project>) => void }) {
+  const [draft, setDraft] = useState({
+    title: project.title || "",
+    description: project.description || "",
+  });
+
+  useEffect(() => {
+    setDraft({
+      title: project.title || "",
+      description: project.description || "",
+    });
+  }, [project.id]);
+
+  const dirty =
+    draft.title !== (project.title || "") ||
+    draft.description !== (project.description || "");
+
+  return (
+    <div className="space-y-4">
+      <Field label="Project Title">
+        <input
+          type="text"
+          value={draft.title}
+          onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+          className="w-full rounded-lg bg-black/40 border border-gray-800 px-2.5 py-2 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50"
+        />
+      </Field>
+
+      <Field label="Description">
+        <textarea
+          value={draft.description}
+          onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+          rows={4}
+          className="w-full rounded-lg bg-black/40 border border-gray-800 px-2.5 py-2 text-xs text-gray-200 focus:outline-none focus:border-rose-500/50 leading-relaxed"
+          placeholder="Describe your film's vision..."
+        />
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3 pt-1">
+        <div className="rounded-lg border border-gray-800 bg-gray-900/40 px-2.5 py-2">
+          <p className="text-gray-600 text-[10px] uppercase tracking-wider">Aspect</p>
+          <p className="text-gray-300 mt-0.5 font-mono text-xs">{project.aspect_ratio}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/40 px-2.5 py-1.5">
-          <p className="text-gray-600 text-[10px] uppercase tracking-wider">Weather</p>
-          <p className="text-gray-300 mt-0.5 capitalize">{scene.weather}</p>
-        </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/40 px-2.5 py-1.5">
-          <p className="text-gray-600 text-[10px] uppercase tracking-wider">Location</p>
-          <p className="text-gray-300 mt-0.5">{scene.location || "—"}</p>
-        </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/40 px-2.5 py-1.5">
-          <p className="text-gray-600 text-[10px] uppercase tracking-wider">Time</p>
-          <p className="text-gray-300 mt-0.5">{scene.time_of_day || "—"}</p>
+        <div className="rounded-lg border border-gray-800 bg-gray-900/40 px-2.5 py-2">
+          <p className="text-gray-600 text-[10px] uppercase tracking-wider">Status</p>
+          <p className="text-gray-300 mt-0.5 text-xs">{project.status}</p>
         </div>
       </div>
-      <p className="text-[11px] text-gray-600 leading-relaxed pt-2 border-t border-gray-800/40">
-        Pick a shot in the center to start editing prompts.
-      </p>
+
+      <button
+        onClick={() => onPatch(draft)}
+        disabled={!dirty || saving}
+        className="w-full mt-2 inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-700 bg-gray-900/60 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-2 text-xs font-medium text-gray-200 transition"
+      >
+        <Save className="w-3.5 h-3.5" /> {saving ? "Saving…" : dirty ? "Save changes" : "Saved"}
+      </button>
     </div>
   );
 }

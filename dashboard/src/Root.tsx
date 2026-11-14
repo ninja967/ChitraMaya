@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { BrowserRouter, Routes, Route, Outlet, useMatch, useNavigate, useParams } from "react-router-dom";
-import { Activity, Menu, Server, UserCircle } from "lucide-react";
+import { Activity, Download, Loader2, Menu, Server, UserCircle } from "lucide-react";
 import { PortfolioView } from "./views/PortfolioView";
 import { ActorProfileView } from "./views/ActorProfileView";
 import { FilmsView } from "./views/FilmsView";
@@ -46,6 +46,7 @@ interface AppContextType {
   addScene: () => Promise<void>;
   deleteScene: (sceneId: string) => Promise<void>;
   deleteShot: (shotId: string) => Promise<void>;
+  renderEvents: any[];
 }
 
 const AppContext = createContext<AppContextType>(null!);
@@ -104,13 +105,14 @@ function Shell() {
       : undefined;
 
   return (
-    <div className="min-h-screen bg-[#08090b] text-white flex flex-col">
-      <header className="h-14 border-b border-gray-800 bg-[#0b0d10]/95 backdrop-blur-xl flex items-center justify-between px-5 sticky top-0 z-40">
+    <div className="min-h-screen bg-[#050608] text-white flex flex-col">
+      {/* ── Premium Glassmorphic Header ── */}
+      <header className="h-14 border-b border-white/[0.06] glass-heavy flex items-center justify-between px-5 sticky top-0 z-40">
         <div className="flex items-center gap-3 min-w-0">
           {!ctx.sidebarOpen && (
             <button
               onClick={() => ctx.setSidebarOpen(true)}
-              className="w-9 h-9 rounded-md border border-gray-800 text-gray-500 hover:text-gray-200 hover:border-gray-600 transition"
+              className="w-9 h-9 rounded-lg border border-white/[0.06] bg-white/[0.02] text-gray-500 hover:text-emerald-300 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all duration-200"
               title="Open tools"
             >
               <Menu className="w-4 h-4 mx-auto" />
@@ -121,15 +123,15 @@ function Shell() {
               navigate("/");
               ctx.setActivePanelTab("generate");
             }}
-            className="flex items-center gap-3 min-w-0 hover:opacity-80 transition"
+            className="flex items-center gap-3 min-w-0 group"
             title="Home"
           >
-            <div className="w-9 h-9 rounded-md border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center">
-              <Activity className="w-4 h-4 text-emerald-300" />
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500/20 via-emerald-600/10 to-teal-500/20 border border-emerald-500/20 flex items-center justify-center group-hover:border-emerald-400/40 group-hover:shadow-lg group-hover:shadow-emerald-500/10 transition-all duration-300">
+              <Activity className="w-4 h-4 text-emerald-400" />
             </div>
             <div className="min-w-0 hidden sm:block">
-              <h1 className="text-sm font-bold tracking-tight">ChitraMaya Control Room</h1>
-              <p className="text-[10px] text-gray-500 tracking-wide">AMD MI300X media pipeline</p>
+              <h1 className="text-sm font-display font-bold tracking-tight bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent">ChitraMaya</h1>
+              <p className="text-[10px] text-gray-600 tracking-wider font-medium uppercase">MI300X · Production</p>
             </div>
           </button>
         </div>
@@ -137,38 +139,38 @@ function Shell() {
         <div className="flex items-center gap-2 text-[11px]">
           <div className="hidden md:flex items-center gap-1.5">
             {ctx.jobs.length > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-800/40 bg-amber-950/30 px-2.5 py-1 text-amber-400 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                {ctx.jobs.length} generating
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/5 px-2.5 py-1 text-amber-400 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-glow-pulse" />
+                {ctx.jobs.length} rendering
               </span>
             )}
-            <span className="rounded-md border border-gray-800 bg-gray-950 px-2.5 py-1 text-gray-500">
-              {ctx.items.length} media
+            <span className="rounded-full border border-white/[0.06] bg-white/[0.02] px-2.5 py-1 text-gray-500 font-medium">
+              {ctx.items.length} assets
             </span>
-            <span className="hidden lg:inline rounded-md border border-gray-800 bg-gray-950 px-2.5 py-1 text-gray-500">
-              {imageCount} images
+            <span className="hidden lg:inline rounded-full border border-white/[0.06] bg-white/[0.02] px-2.5 py-1 text-gray-500">
+              {imageCount} img
             </span>
-            <span className="hidden lg:inline rounded-md border border-gray-800 bg-gray-950 px-2.5 py-1 text-gray-500">
-              {videoCount} videos
+            <span className="hidden lg:inline rounded-full border border-white/[0.06] bg-white/[0.02] px-2.5 py-1 text-gray-500">
+              {videoCount} vid
             </span>
-            <span className="hidden xl:inline-flex items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-emerald-300">
-              <Server className="w-3 h-3" />
-              ComfyUI linked
+            <span className="hidden xl:inline-flex items-center gap-1.5 rounded-full border border-emerald-500/15 bg-emerald-500/5 px-2.5 py-1 text-emerald-400/80">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              ComfyUI
             </span>
           </div>
 
           <div className="group relative">
-            <button className="flex items-center gap-2 rounded-md border border-gray-700 bg-gray-950 px-2.5 py-1.5 text-gray-200 hover:border-gray-500 transition">
+            <button className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-gray-300 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all duration-200">
               <UserCircle className="w-4 h-4" />
-              <span className="hidden sm:inline font-medium">Operator View</span>
-              <span className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-emerald-300">
+              <span className="hidden sm:inline font-medium text-xs">Operator</span>
+              <span className="rounded-full bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-emerald-300 font-semibold">
                 Live
               </span>
             </button>
-            <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 w-72 rounded-lg border border-gray-800 bg-gray-950/95 p-4 shadow-2xl shadow-black/60 opacity-0 translate-y-1 transition group-hover:opacity-100 group-hover:translate-y-0">
-              <p className="text-xs font-semibold text-gray-200">Hugging Face demo surface</p>
-              <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                A public control plane for image generation, video generation, identity LoRA work, and multi-shot project planning on AMD GPUs.
+            <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-white/[0.06] glass-heavy p-4 shadow-2xl shadow-black/80 opacity-0 translate-y-2 transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto">
+              <p className="text-xs font-semibold text-gray-100 font-display">Production Console</p>
+              <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+                Enterprise control plane for image + video generation, identity LoRA training, and multi-shot cinematic production on AMD MI300X.
               </p>
             </div>
           </div>
@@ -177,43 +179,82 @@ function Shell() {
 
       <div className="flex flex-1 min-h-0">
         {ctx.sidebarOpen && (
-          <ControlPanel
-            activeTab={ctx.activePanelTab}
-            onTabChange={(tab) => {
-              ctx.setActivePanelTab(tab);
-              if (tab === "projects") navigate("/projects");
-            }}
-            onClose={() => ctx.setSidebarOpen(false)}
-            checkpoints={ctx.checkpoints}
-            onQueued={ctx.load}
-            onSelectCharacter={(id) => {
-              ctx.setActivePanelTab("characters");
-              navigate(`/characters/${id}`);
-            }}
-            projectMode={projectMode}
-          />
+          <div className="animate-slide-right">
+            <ControlPanel
+              activeTab={ctx.activePanelTab}
+              onTabChange={(tab) => {
+                ctx.setActivePanelTab(tab);
+                if (tab === "projects") navigate("/projects");
+              }}
+              onClose={() => ctx.setSidebarOpen(false)}
+              checkpoints={ctx.checkpoints}
+              onQueued={ctx.load}
+              onSelectCharacter={(id) => {
+                ctx.setActivePanelTab("characters");
+                navigate(`/characters/${id}`);
+              }}
+              projectMode={projectMode}
+            />
+          </div>
         )}
 
-        <main className="flex-1 min-w-0 overflow-y-auto bg-[#08090b]">
+        <main className="flex-1 min-w-0 overflow-y-auto bg-[#050608]">
           <Outlet />
         </main>
       </div>
 
-      {/* Lightbox */}
+      {/* ── Cinematic Lightbox ── */}
       {ctx.selected && (
         <div
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/98 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in"
           onClick={() => ctx.setSelected(null)}
         >
-          <div className="max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-full max-h-full animate-scale-in relative group" onClick={(e) => e.stopPropagation()}>
+            <a
+              href={ctx.selected}
+              download="chitramaya-render"
+              className="absolute top-4 right-4 z-[60] w-12 h-12 rounded-full bg-black/60 hover:bg-emerald-600 text-white flex items-center justify-center backdrop-blur-md transition-all border border-white/20 opacity-0 group-hover:opacity-100"
+              title="Download high-res"
+            >
+              <Download className="w-6 h-6" />
+            </a>
             {ctx.selected.endsWith(".mp4") || ctx.selected.endsWith(".webm") ? (
-              <video src={ctx.selected} controls autoPlay className="max-w-full max-h-[90vh] rounded" />
+              <video src={ctx.selected} controls autoPlay className="max-w-full max-h-[90vh] rounded-xl shadow-2xl shadow-black/80 ring-1 ring-white/[0.06]" />
             ) : (
-              <img src={ctx.selected} alt="" className="max-w-full max-h-[90vh] rounded" />
+              <img src={ctx.selected} alt="" className="max-w-full max-h-[90vh] rounded-xl shadow-2xl shadow-black/80 ring-1 ring-white/[0.06]" />
             )}
           </div>
         </div>
       )}
+
+      {/* ── Real-time Render Progress Overlay ── */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
+        {ctx.renderEvents
+          .filter((e) => e.type === "job_update" && e.status === "rendering")
+          .slice(0, 1)
+          .map((event) => (
+            <div
+              key={event.job_id}
+              className="w-80 glass-heavy border border-emerald-500/30 rounded-2xl p-4 shadow-2xl shadow-black pointer-events-auto animate-slide-up"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Rendering Film
+                </span>
+                <span className="text-[10px] font-mono text-emerald-300/60">{event.progress}%</span>
+              </div>
+              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500 ease-out"
+                  style={{ width: `${event.progress}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-gray-400 mt-2 font-medium truncate">
+                {event.message || "Processing shots..."}
+              </p>
+            </div>
+          ))}
+      </div>
     </div>
   );
 }
@@ -312,6 +353,7 @@ export default function App() {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [renderEvents, setRenderEvents] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     if (!hasLoadedOnce) setLoading(true);
@@ -343,7 +385,29 @@ export default function App() {
   useEffect(() => {
     load();
     const id = window.setInterval(load, 5000);
-    return () => window.clearInterval(id);
+
+    const es = new EventSource("/api/events");
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        setRenderEvents((prev) => [data, ...prev].slice(0, 50));
+        if (data.type === "job_update") {
+          if (data.status === "completed" || data.status === "failed") {
+            load();
+            if (data.project_id) {
+              loadProject(data.project_id);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("SSE parse error", err);
+      }
+    };
+
+    return () => {
+      window.clearInterval(id);
+      es.close();
+    };
   }, [load]);
 
   const loadProject = useCallback(async (id: string) => {
@@ -458,6 +522,7 @@ export default function App() {
     addScene,
     deleteScene,
     deleteShot,
+    renderEvents,
   };
 
   return (

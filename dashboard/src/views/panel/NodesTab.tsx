@@ -41,6 +41,7 @@ function roleClass(role: string) {
 
 export function NodesTab() {
   const [nodes, setNodes] = useState<Record<string, NodeInfo>>({});
+  const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,10 +50,20 @@ export function NodesTab() {
     async function load() {
       try {
         setError(null);
-        const response = await fetch("/api/nodes");
-        if (!response.ok) throw new Error(`/api/nodes returned ${response.status}`);
-        const data = await response.json();
-        if (!cancelled) setNodes(data.nodes || {});
+        const [nodesRes, jobsRes] = await Promise.all([
+          fetch("/api/nodes"),
+          fetch("/api/jobs")
+        ]);
+        
+        if (!nodesRes.ok) throw new Error(`/api/nodes returned ${nodesRes.status}`);
+        const nodesData = await nodesRes.json();
+        
+        if (jobsRes.ok) {
+          const jobsData = await jobsRes.json();
+          if (!cancelled) setJobs(jobsData.jobs || []);
+        }
+
+        if (!cancelled) setNodes(nodesData.nodes || {});
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       } finally {
@@ -175,6 +186,46 @@ export function NodesTab() {
           </div>
         );
       })}
+
+      {/* ── Job Queue Observability ── */}
+      <div className="pt-4 border-t border-gray-800/40">
+        <h2 className="text-sm font-semibold text-gray-200 mb-3 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+          Agent Job Queue
+        </h2>
+        
+        {jobs.length === 0 ? (
+          <div className="rounded-xl border border-gray-800/60 bg-gray-900/30 p-4 text-xs text-gray-500 text-center">
+            No active or recent compute jobs.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {jobs.slice(0, 8).map((job) => (
+              <div key={job.prompt_id || job.id} className="rounded-lg border border-gray-800/60 bg-black/40 p-3 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-gray-500">ID: {(job.prompt_id || job.id || "").slice(0,8)}</span>
+                  <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
+                    job.status === "running" ? "text-blue-300 border-blue-500/30 bg-blue-500/10" :
+                    job.status === "completed" ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" :
+                    job.status === "failed" ? "text-red-300 border-red-500/30 bg-red-500/10" :
+                    "text-amber-300 border-amber-500/30 bg-amber-500/10"
+                  }`}>
+                    {job.status}
+                  </span>
+                </div>
+                {job.metadata?.progress_percent != null && job.status === "running" && (
+                  <div className="h-1.5 rounded-full bg-gray-800 overflow-hidden w-full mt-1">
+                    <div className="h-full bg-blue-500 transition-all" style={{ width: `${job.metadata.progress_percent}%` }} />
+                  </div>
+                )}
+                <div className="text-[11px] text-gray-300 truncate font-mono mt-1">
+                  [agent_dispatch] → {job.workflow || job.metadata?.mode || "workflow_execution"}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
